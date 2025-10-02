@@ -228,37 +228,39 @@ fig.savefig(output_dir + 'image-analysis-roots-example-output.pdf', dpi=300)
 
 PLANT_IDX = 1
 
-# Zoom into the first plant using its bounding box
-first_bbox = bboxes_dil[PLANT_IDX]
-minr, minc, maxr, maxc = first_bbox
+for PLANT_IDX in range(len(rprops_dil)):
+    
+    # Zoom into the first plant using its bounding box
+    first_bbox = bboxes_dil[PLANT_IDX]
+    minr, minc, maxr, maxc = first_bbox
 
-# Crop relevant arrays
-img2_red_crop = img2_red[minr:maxr, minc:maxc]
-mask_bboxadj_crop = mask_bboxadj[minr:maxr, minc:maxc]
-mask_bboxadj2_crop = mask_bboxadj2[minr:maxr, minc:maxc]
-mask_roots_cut_crop = mask_roots_cut[minr:maxr, minc:maxc]
-distance_map_skel_crop = distance_map_skel[minr:maxr, minc:maxc]
-img2_maskotsu_close_crop = img2_maskotsu_close[minr:maxr, minc:maxc]
-img2_maskotsu_dilate_filt_crop = img2_maskotsu_dilate_filt[minr:maxr, minc:maxc]
-img2_maskotsu_dilate_filt_skel_crop = img2_maskotsu_dilate_filt_skel[minr:maxr, minc:maxc]
+    # Crop relevant arrays
+    img2_red_crop = img2_red[minr:maxr, minc:maxc]
+    mask_bboxadj_crop = mask_bboxadj[minr:maxr, minc:maxc]
+    mask_bboxadj2_crop = mask_bboxadj2[minr:maxr, minc:maxc]
+    mask_roots_cut_crop = mask_roots_cut[minr:maxr, minc:maxc]
+    distance_map_skel_crop = distance_map_skel[minr:maxr, minc:maxc]
+    img2_maskotsu_close_crop = img2_maskotsu_close[minr:maxr, minc:maxc]
+    img2_maskotsu_dilate_filt_crop = img2_maskotsu_dilate_filt[minr:maxr, minc:maxc]
+    img2_maskotsu_dilate_filt_skel_crop = img2_maskotsu_dilate_filt_skel[minr:maxr, minc:maxc]
 
-# Get root start location relative to crop
-root_start_loc_crop = root_start_loc[PLANT_IDX] - np.array([minr, minc])
+    # Get root start location relative to crop
+    root_start_loc_crop = root_start_loc[PLANT_IDX] - np.array([minr, minc])
 
-# Plot
-fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-ax.imshow(img2_red_crop, cmap='Reds')
-ax.contour(img2_maskotsu_close_crop, colors='black', linewidths=2)
-ax.contour(img2_maskotsu_dilate_filt_crop, colors='green', linewidths=2)
-ax.imshow(distance_map_skel_crop, cmap='viridis', alpha=(img2_maskotsu_dilate_filt_skel_crop>0)*1.0)
-ax.plot(root_start_loc_crop[1], root_start_loc_crop[0], 'o', markersize=8, markerfacecolor='none', markeredgecolor='yellow', markeredgewidth=2)
-ax.contour(mask_bboxadj_crop, colors='blue', linewidths=2.0)
-ax.contour(mask_bboxadj2_crop, colors='white', linewidths=2.0)
-# ax.contour(mask_roots_cut_crop, colors='black', linewidths=2.0)
-# Add text with root length
-total_root_pixels_crop = np.sum(mask_roots_cut_crop)
-ax.text((maxc-minc)//2, (maxr-minr)+10, f'#1\n{total_root_pixels_crop} px', color='black', fontsize=10, ha='center', va='top')
-plt.tight_layout()
-fig.savefig(output_dir + f'image-analysis-roots-example-output-plant{PLANT_IDX}.pdf', dpi=300)
+    # Plot
+    fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+    ax.imshow(img2_red_crop, cmap='Reds')
+    ax.contour(img2_maskotsu_close_crop, colors='black', linewidths=2)
+    ax.contour(img2_maskotsu_dilate_filt_crop, colors='green', linewidths=2)
+    ax.imshow(distance_map_skel_crop, cmap='viridis', alpha=(img2_maskotsu_dilate_filt_skel_crop>0)*1.0)
+    ax.plot(root_start_loc_crop[1], root_start_loc_crop[0], 'o', markersize=8, markerfacecolor='none', markeredgecolor='yellow', markeredgewidth=2)
+    ax.contour(mask_bboxadj_crop, colors='blue', linewidths=2.0)
+    ax.contour(mask_bboxadj2_crop, colors='white', linewidths=2.0)
+    # ax.contour(mask_roots_cut_crop, colors='black', linewidths=2.0)
+    # Add text with root length
+    total_root_pixels_crop = np.sum(mask_roots_cut_crop)
+    ax.text((maxc-minc)//2, (maxr-minr)+10, f'#1\n{total_root_pixels_crop} px', color='black', fontsize=10, ha='center', va='top')
+    plt.tight_layout()
+    fig.savefig(output_dir + f'image-analysis-roots-example-output-plant{PLANT_IDX}.pdf', dpi=300)
 
 
