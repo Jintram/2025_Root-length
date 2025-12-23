@@ -203,21 +203,23 @@ for lbl, coord in zip(labels, zip(rows, cols)):
 %matplotlib qt
 plt.show()
 
-
 # this has worked neatly, now, loop over each of the labels, and gather any 
 # label that is in the direct neighborhood of any of these pixels
-# Initialize adjacency dictionary
-adjacency = {}
-sizes     = {}
+
+# Initialize networkx graph
+G = nx.Graph()
 
 # Get all unique labels excluding background (0)
 unique_labels = np.unique(labeled_skeleton_no_branchpoints)
 unique_labels = unique_labels[unique_labels != 0]
 
+# Add nodes to the graph
+G.add_nodes_from(unique_labels)
+
 # Define a 3x3 structure for 8-connectivity
 struct = morphology.square(3)
 
-print("Calculating adjacency...")
+print("Calculating adjacency and building graph...")
 for label_id in unique_labels:
     # Create a binary mask for the current label
     current_mask = labeled_skeleton_no_branchpoints == label_id
@@ -235,32 +237,163 @@ for label_id in unique_labels:
     # Filter out background (0) and the label itself
     neighbor_labels = neighbor_labels[(neighbor_labels != 0) & (neighbor_labels != label_id)]
     
-    # Store in dictionary
-    adjacency[label_id] = neighbor_labels.tolist()
-
-# Print the results
-print("Adjacency list:")
-for label, neighbors in adjacency.items():
-    print(f"Label {label} connects to: {neighbors}")
-
-
-# now convert the adjacency to a networkx graph
-G = nx.Graph()
-G.add_nodes_from(adjacency.keys())
-
-for node, neighbors in adjacency.items():
-    for neighbor in neighbors:
-        G.add_edge(node, neighbor)
+    # Add edges to the graph directly
+    for neighbor in neighbor_labels:
+        G.add_edge(label_id, neighbor)
+    # Now also add the area of the segment as node attribute
+    segment_area = np.sum(current_mask)
+    G.nodes[label_id]['area'] = segment_area
 
 print(f"Graph created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges.")
 
 # Visualize the graph abstractly
+def visualize_graph_nodesize(G):
+    plt.figure()
+    node_sizes = np.array([G.nodes[n]['area'] for n in G.nodes])
+    nx.draw(G, with_labels=True, node_color='lightblue', 
+            edge_color='gray', node_size=node_sizes*10)
+    plt.title("Connectivity Graph")
+    plt.show()
+
+visualize_graph_nodesize(G)
+
+
+# Now simplify the graph
+def simplify_graph_by_contracting_degree2_nodes(G):
+        
+    G_simple = G.copy()
+    nodes_to_remove = [n for n in G_simple.nodes if G_simple.degree(n) == 2]
+    
+    # first, set all edges to length 1
+    for u, v in G_simple.edges():
+        G_simple[u][v]['length'] = 1
+    
+    for n in nodes_to_remove:
+        # get neighbors
+        neighbors = list(G_simple.neighbors(n))
+        # tidy (remove this node replace by 1 edge) if it has only 2 neighbors
+        if len(neighbors) == 2:
+            u, v = neighbors
+            
+            # Now set weight, that will equal the area of the node that was removed
+            length = G_simple.nodes[n].get('area', 1)
+            
+            # weight = 0
+            # if G_simple.has_edge(u, n) and G_simple.has_edge(n, v):
+            #     weight = G_simple[u][n].get('length', 1) + G_simple[n][v].get('length', 1)
+            
+            # add the new edge replacing the node
+            G_simple.add_edge(u, v, length=length)
+            
+            # remove the node
+            G_simple.remove_node(n)
+    
+    # now make a list of the area of all nodes
+    all_areas = np.array(
+        [G_simple.nodes[n]['area'] for n in G_simple.nodes])
+    # check if they are all 1 
+    if np.all(all_areas == 1):
+        print("Check passed, all node areas are 1 after simplification.")
+    else:
+        print("Check failed, not all node areas are 1 after simplification.")
+    
+    return G_simple
+
+def visualize_graph_edgelength(G):
+    plt.figure()
+    node_sizes = np.array([G.nodes[n]['area'] for n in G.nodes])
+    # Get edge weights
+    edge_lengths     = [G[u][v].get('length', 1) for u, v in G.edges()]
+    edge_lengths_inv = 1/np.array(edge_lengths)
+    # now add inverse weights
+    for (u, v), inv_l in zip(G.edges(), edge_lengths_inv):
+        G[u][v]['inv_l'] = inv_l
+    # Use edge weights as edge lengths in spring_layout
+    pos = nx.spring_layout(G, weight="inv_l")
+    nx.draw(G, pos, with_labels=True, node_color='lightblue',
+            edge_color='gray', node_size=node_sizes*10)
+    plt.title("Connectivity Graph (edge length ~ weight)")
+    plt.show()
+
+# get the simplified graph
+G_simplified = simplify_graph_by_contracting_degree2_nodes(G)
+# Now visualize it again
+visualize_graph_edgelength(G_simplified)
+
+all_areas = [G_simplified.nodes[n]['area'] for n in G_simplified.nodes]
+
+# Now find the longest possible path with G_simplified
+def get_long_path_in_graph_edgelength(G):
+    longest_path = []
+    max_length = 0
+    # check all pairs of nodes
+    for source in G.nodes:
+        for target in G.nodes:
+            if source != target:
+                path = nx.shortest_path(G, source=source, target=target, weight='length')
+                # Calculate path length
+                path_length = sum(G[u][v].get('length') for u, v in zip(path[:-1], path[1:]))
+                if path_length > max_length:
+                    max_length = path_length
+                    longest_path = path
+    print(f"Longest path length: {max_length}")
+    print(f"Longest path end nodes: {[longest_path[0], longest_path[-1]]}")
+    
+    return longest_path, max_length
+
+longest_path, max_length = get_long_path_in_graph_edgelength(G_simplified)
+
+# Now find the longest possible path within the network
+def get_long_path_in_graph_nodearea(G):
+    longest_path = []
+    max_length = 0
+    # check all pairs of nodes
+    for source in G.nodes:
+        for target in G.nodes:
+            if source != target:
+                path = nx.shortest_path(G, source=source, target=target, weight='length')
+                # Calculate path length
+                # path_length = sum(G[u][v].get('length') for u, v in zip(path[:-1], path[1:]))
+                # Using the areas of the involved nodes
+                path_length = sum(G.nodes[n].get('area', 1) for n in path)
+                if path_length > max_length:
+                    max_length = path_length
+                    longest_path = path
+    print(f"Longest path length: {max_length}")
+    print(f"Longest path end nodes: {[longest_path[0], longest_path[-1]]}")
+    
+    return longest_path, max_length
+
+longest_path, max_length = get_long_path_in_graph_edgelength(G_simplified)
+longest_path, max_length = get_long_path_in_graph_nodearea(G)
+
+# For reference, print G again
+visualize_graph_nodesize(G)
+
+# now use the ids in longest_path to highlight that path in the original skeleton image
+skeleton_highlighted = skeleton_firstroot*1
+for node_id in longest_path:
+    skeleton_highlighted[labeled_skeleton_no_branchpoints == node_id] = 2
 plt.figure()
-nx.draw(G, with_labels=True, node_color='lightblue', edge_color='gray')
-plt.title("Connectivity Graph")
+plt.imshow(skeleton_highlighted, cmap='viridis')
+plt.title("Longest Path Highlighted in Skeleton")
+%matplotlib qt
 plt.show()
-
-
+    
+    
+def assign_distances_edges(G, labeled_skeleton):
+    """
+    To facilitate calculating the distance between any two nodes, this 
+    function will add distances to both nodes and edges.
+    - Nodes >1px will be assigned length based <algorithm X>
+        --> chatgpt suggested finding neighboring pixels for all
+        pixels in segmenet, and calculate all neighbor lengths..
+        seems also a bit elaborate
+    - Nodes of 1 px will be assigned a length of 0
+    - Edges between two pixels will be either given 
+        - l = 1
+        - l = sqrt(2)
+    """    
 
 
 # %%
