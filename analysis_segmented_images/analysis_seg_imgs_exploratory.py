@@ -208,6 +208,7 @@ plt.show()
 # label that is in the direct neighborhood of any of these pixels
 # Initialize adjacency dictionary
 adjacency = {}
+sizes     = {}
 
 # Get all unique labels excluding background (0)
 unique_labels = np.unique(labeled_skeleton_no_branchpoints)
@@ -242,14 +243,6 @@ print("Adjacency list:")
 for label, neighbors in adjacency.items():
     print(f"Label {label} connects to: {neighbors}")
 
-XXXXX continue here !!!! XXXXX continue here !!!! XXXXX continue here !!!!
-XXXXX continue here !!!! XXXXX continue here !!!! XXXXX continue here !!!!
-TEST THE CODE BELOW!!!
-
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# issue is that now i have nodes, but segments that are not branchpoints
-# are not edges of length X, instead, each label is simply a node
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 # now convert the adjacency to a networkx graph
 G = nx.Graph()
@@ -268,8 +261,6 @@ plt.title("Connectivity Graph")
 plt.show()
 
 
-XXXXX continue here !!!! XXXXX continue here !!!! XXXXX continue here !!!!
-XXXXX continue here !!!! XXXXX continue here !!!! XXXXX continue here !!!!
 
 
 # %%
