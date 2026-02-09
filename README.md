@@ -25,7 +25,9 @@ At this analysis stage, a set of scripts have already segmented images of roots.
 
 <img src="figures/example_plant_segmentation.png" width=50%>
 
-**Figure** *Here, white is the root, green is the shoot, brown is the seed, and dark green are leaves (as determined by 
+<p width=50%>
+**Figure.** *Here, white is the root, green is the shoot, brown is the seed, and dark green are leaves (as determined by 
 the segmentation).*
+</p>
 
 
