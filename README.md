@@ -25,9 +25,43 @@ At this analysis stage, a set of scripts have already segmented images of roots.
 
 <img src="figures/example_plant_segmentation.png" width=50%>
 
-<div width=50%>
-**Figure.** *Here, white is the root, green is the shoot, brown is the seed, and dark green are leaves (as determined by 
+**Image above:** *White is the root, green is the shoot, brown is the seed, and dark green are leaves (as determined by 
 the segmentation).*
-</div>
+
+We want to determine the size of the root.
+
+#### Definition of size
+
+Size could be quantified in multiple ways, most straight-forward would be:
+1. **length along the longest branch of the root**
+2. total area
+
+We'll use the first definition.
+
+### Script 
+
+*This is work in progress..*
+
+This script does the following:
+
+
+**Input:** `.npy` files with labeled masks that encode the segmentation. 
+- 0 = background (colored black by my script)
+- 1 = shoot (light green)
+- 2 = root (white)
+- 3 = seed (brown)
+- 4 = leaf (dark green).
+
+**Processing**
+1. Some cleanup on the segmentation
+2. Skeletonize the root
+3. Perform branch analysis to identify the largest branch
+4. Calculate the length of the branch
+
+**Output:** A dataframe with:
+  - Sample name
+  - Plant ID
+  - Length of the root
+
 
 
