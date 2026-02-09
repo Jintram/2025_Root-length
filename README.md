@@ -24,6 +24,7 @@ from these color pictures.
 At this analysis stage, a set of scripts have already segmented images of roots. The image below shows an overlay both of segmentation and original picture of the plants.
 
 <img src="figures/example_plant_segmentation.png" width=50%>
+
 **Figure** *Here, white is the root, green is the shoot, brown is the seed, and dark green are leaves (as determined by 
 the segmentation).*
 
