@@ -69,7 +69,7 @@ This script does the following:
 
 | Root mask | Branch points removed | Labeled mask |
 |--------|-------------|-----------|
-|   <img src="example_files/idealized_root_masks/root_mask_1.tif">    |   <img src="example_files/idealized_root_masks/root_mask_1.tif">  |  <img src="example_files/idealized_root_masks/root_mask_1.tif"> |
+|   <img src="example_files/idealized_root_masks/root_mask_1.png">    |   <img src="example_files/idealized_root_masks/root_mask_1.tif">  |  <img src="example_files/idealized_root_masks/root_mask_1.tif"> |
 |   XXXXX    |   XXXXX  |  XXXXX |
 
 
