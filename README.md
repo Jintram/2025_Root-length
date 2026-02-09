@@ -72,10 +72,10 @@ This script does the following:
 |   A synthetic idealized image of a root. |   XXXXX  |  XXXXX | XXXXX |
 
 Zoom of labeled branching structure:
-<img src="zoom_labeled_skeleton_no_branchpoints.png">
+<img src="figures/zoom_labeled_skeleton_no_branchpoints.png">
 
 Graph:
-<img src="connectivity_graph_nodesize.png">
+<img src="figures/connectivity_graph_nodesize.png">
 
 
 
