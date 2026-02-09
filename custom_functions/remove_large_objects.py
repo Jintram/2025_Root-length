@@ -11,7 +11,12 @@ from skimage.measure import label, regionprops
 
 
 def remove_large_objects(img_mask_binary, max_size):
-    """Using regionprops to remove large regions from binary mask."""
+    """
+    Using regionprops to remove large regions from binary mask.
+    
+    TO DO: would be more efficient to do this other way around (ie remove large
+    regions from copied image)
+    """
     
     # Label connected regions
     label_img = label(img_mask_binary)

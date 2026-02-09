@@ -391,8 +391,8 @@ def assign_distances_edges(G, labeled_skeleton):
         seems also a bit elaborate
     - Nodes of 1 px will be assigned a length of 0
     - Edges between two pixels will be either given 
-        - l = 1
-        - l = sqrt(2)
+        - l = 1 (hor/vertical connection)
+        - l = sqrt(2) (diagonal connection)
     """    
 
 
