@@ -115,11 +115,13 @@ mask_firstroot_realplant = mask_firstroot
     # Maybe also create an idealized root mask, with some challenges in it,
     # to see if I can deal with that..
 
-testmask_file_path = "/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/idealized_root_images/root_mask_1.tif"
-testmask_file_path = "/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/idealized_root_images/root_mask_2.tif"
+# Load test files
+testmask_file_path = "example_files/idealized_root_masks/root_mask_1.tif"
+testmask_file_path = "example_files/idealized_root_masks/root_mask_2.tif"
 # Load it
 mask_firstroot = plt.imread(testmask_file_path)
 
+# Or use real plant input
 mask_firstroot = mask_firstroot_realplant
 
 # now skeletonize this
@@ -131,7 +133,7 @@ axs[0].imshow(mask_firstroot)
 axs[1].imshow(skeleton_firstroot)
 
 # save the skeleton to a tiff image
-tiff.imwrite(dir_output_exploratory + "skeleton_firstroot.tif", 
+tiff.imwrite(dir_output_exploratory + "skeleton_firstroot.tif",
             skeleton_firstroot.astype(np.uint8)*255)
 
 
@@ -165,6 +167,9 @@ plt.title("Skeleton with branch points removed")
 # plot nodes on top, use large open spheres of multipel colors
 plt.plot(branchpoint_coords[:, 1], branchpoint_coords[:, 0], 'ro', markersize=8, markerfacecolor='none')
 plt.plot(endpoint_coords[:, 1], endpoint_coords[:, 0], 'wo', markersize=8, markerfacecolor='none')
+# and save
+plt.savefig(dir_output_exploratory + "skeleton_no_branchpoints.png", dpi=300)
+
 %matplotlib qt
 plt.show()
 
@@ -195,14 +200,20 @@ plt.savefig(dir_output_exploratory + "labeled_skeleton_no_branchpoints.png", dpi
 %matplotlib qt
 plt.show()
 
-
-plt.figure()
+plt.figure(figsize=(0.08*labeled_skeleton_no_branchpoints.shape[0]*cm_to_inch,
+                    0.08*labeled_skeleton_no_branchpoints.shape[1]*myratio*cm_to_inch))
+# plt.figure(figsize=(12*cm_to_inch, 12*myratio*cm_to_inch))
 plt.imshow(labeled_skeleton_no_branchpoints, cmap=cmap_random_rainbow)
 for lbl, coord in zip(labels, zip(rows, cols)):
-    plt.text(coord[1], coord[0], str(lbl), color='black', fontsize=6, ha='center', va='center')
+    plt.text(coord[1], coord[0], str(lbl), color='black', fontsize=0.5, ha='center', va='center')
+# and save
+plt.savefig(dir_output_exploratory + "labeled_skeleton_no_branchpoints_with_labels.pdf", dpi=1200)
+
 %matplotlib qt
 plt.show()
 
+
+# %% 
 # this has worked neatly, now, loop over each of the labels, and gather any 
 # label that is in the direct neighborhood of any of these pixels
 

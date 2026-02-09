@@ -25,7 +25,7 @@ At this analysis stage, a set of scripts have already segmented images of roots.
 
 <img src="figures/example_plant_segmentation.png" width=50%>
 
-**Image above:** *White is the root, green is the shoot, brown is the seed, and dark green are leaves (as determined by 
+**Image description:** *White is the root, green is the shoot, brown is the seed, and dark green are leaves (as determined by 
 the segmentation).*
 
 We want to determine the size of the root.
@@ -44,7 +44,6 @@ We'll use the first definition.
 
 This script does the following:
 
-
 **Input:** `.npy` files with labeled masks that encode the segmentation. 
 - 0 = background (colored black by my script)
 - 1 = shoot (light green)
@@ -52,7 +51,7 @@ This script does the following:
 - 3 = seed (brown)
 - 4 = leaf (dark green).
 
-**Processing**
+**Processing steps:**
 1. Some cleanup on the segmentation
 2. Skeletonize the root
 3. Perform branch analysis to identify the largest branch
@@ -62,6 +61,20 @@ This script does the following:
   - Sample name
   - Plant ID
   - Length of the root
+
+## Detailed technical notes
+
+### Branch analysis notes
+
+
+| Root mask | Branch points removed | Labeled mask |
+|--------|-------------|-----------|
+|   <img src="example_files/idealized_root_masks/root_mask_1.tif">    |   <img src="example_files/idealized_root_masks/root_mask_1.tif">  |  <img src="example_files/idealized_root_masks/root_mask_1.tif"> |
+|   XXXXX    |   XXXXX  |  XXXXX |
+
+
+
+Graph:
 
 
 
