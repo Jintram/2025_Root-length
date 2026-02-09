@@ -213,6 +213,10 @@ plt.savefig(dir_output_exploratory + "labeled_skeleton_no_branchpoints_with_labe
 plt.show()
 
 
+# %%
+
+print("test")
+
 # %% 
 # this has worked neatly, now, loop over each of the labels, and gather any 
 # label that is in the direct neighborhood of any of these pixels
@@ -259,14 +263,17 @@ print(f"Graph created with {G.number_of_nodes()} nodes and {G.number_of_edges()}
 
 # Visualize the graph abstractly
 def visualize_graph_nodesize(G):
-    plt.figure()
+    fig, ax = plt.subplots()
     node_sizes = np.array([G.nodes[n]['area'] for n in G.nodes])
     nx.draw(G, with_labels=True, node_color='lightblue', 
             edge_color='gray', node_size=node_sizes*10)
-    plt.title("Connectivity Graph")
-    plt.show()
+    ax.set_title("Connectivity Graph")
+    
+    # plt.show()
+    return fig, ax
 
-visualize_graph_nodesize(G)
+fig, ax = visualize_graph_nodesize(G)
+fig.savefig(dir_output_exploratory + "connectivity_graph_nodesize.png", dpi=300)
 
 
 # Now simplify the graph

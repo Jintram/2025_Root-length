@@ -66,15 +66,18 @@ This script does the following:
 
 ### Branch analysis notes
 
-
 | Root mask | Skeleton | Branch points removed | Labeled mask |
 |--------|-------------|-----------|-------------|
-|   <img src="example_files/idealized_root_masks/root_mask_1.png">    | <img src="figures/skeleton_firstroot.tif"> |  <img src="figures/skeleton_firstroot.tif">  |  <img src="example_files/idealized_root_masks/root_mask_1.tif"> |
-|   XXXXX    |   XXXXX  |  XXXXX | XXXXX |
+|   <img src="example_files/idealized_root_masks/root_mask_1.png">    | <img src="figures/skeleton_firstroot.png"> |  <img src="figures/skeleton_no_branchpoints.png">  |  <img src="figures/labeled_skeleton_no_branchpoints.png"> |
+|   A synthetic idealized image of a root. |   XXXXX  |  XXXXX | XXXXX |
 
-
+Zoom of labeled branching structure:
+<img src="zoom_labeled_skeleton_no_branchpoints.png">
 
 Graph:
+<img src="connectivity_graph_nodesize.png">
+
+
 
 
 
