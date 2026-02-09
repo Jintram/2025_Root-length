@@ -69,12 +69,12 @@ This script does the following:
 | Root mask | Skeleton | Branch points removed | Labeled mask |
 |--------|-------------|-----------|-------------|
 |   <img src="example_files/idealized_root_masks/root_mask_1.png" height=300px>    | <img src="figures/skeleton_firstroot.png" height=300px> |  <img src="figures/skeleton_no_branchpoints.png" height=300px>  |  <img src="figures/labeled_skeleton_no_branchpoints.png" height=300px> |
-|   A synthetic idealized image of a root. |  Skeletonized version of the root mask.  |  For all pixels, neighbour counts are determined. Pixels with >2 connected pixels are removed, such that separate branches can be identified by labeling the mask. (removed pixels highlighted with red squares). End points are identified as they have only 1 connected pixel (white squares). | Finally, a labeled mask is constructed based on the mask with removed branch points. Importantly, branch points are re-introduced, each with their unique label, for connectivity analysis. |
+|   A synthetic idealized image of a root. |  Skeletonized version of the root mask.  |  For all pixels, neighbour counts are determined. Pixels with >2 connected pixels are removed, such that separate branches can be identified by labeling the mask. (removed pixels highlighted with red squares). End points are identified as they have only 1 connected pixel (white squares). | Finally, a labeled mask is constructed based on the mask with removed branch points. Importantly, branch points are re-introduced, each with their unique label, for connectivity analysis. Also end points receive their own unique label. |
 
 Zoom of labeled branching structure:
 <img src="figures/zoom_labeled_skeleton_no_branchpoints.png">
 
-**Description of figure above.** *Zoomed versio of the labeled mask with labels printed on top.*
+**Description of figure above.** *Zoomed version of the labeled mask with labels printed on top.*
 
 Graph:
 <img src="figures/connectivity_graph_nodesize.png">

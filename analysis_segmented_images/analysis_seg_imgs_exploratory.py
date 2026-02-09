@@ -277,6 +277,10 @@ fig.savefig(dir_output_exploratory + "connectivity_graph_nodesize.png", dpi=300)
 
 
 # Now simplify the graph
+# NOTE: I'm reviewing the code, and should check why this is necessary. 
+# Is this just to remove the nodes that are connected to end points? Why
+# are end points necessary? Perhaps I should work with the mask that 
+# doesn't have them?
 def simplify_graph_by_contracting_degree2_nodes(G):
         
     G_simple = G.copy()
@@ -309,6 +313,7 @@ def simplify_graph_by_contracting_degree2_nodes(G):
     # now make a list of the area of all nodes
     all_areas = np.array(
         [G_simple.nodes[n]['area'] for n in G_simple.nodes])
+    
     # check if they are all 1 
     if np.all(all_areas == 1):
         print("Check passed, all node areas are 1 after simplification.")
@@ -318,18 +323,24 @@ def simplify_graph_by_contracting_degree2_nodes(G):
     return G_simple
 
 def visualize_graph_edgelength(G):
+    
     plt.figure()
+    
     node_sizes = np.array([G.nodes[n]['area'] for n in G.nodes])
+    
     # Get edge weights
     edge_lengths     = [G[u][v].get('length', 1) for u, v in G.edges()]
     edge_lengths_inv = 1/np.array(edge_lengths)
+    
     # now add inverse weights
     for (u, v), inv_l in zip(G.edges(), edge_lengths_inv):
         G[u][v]['inv_l'] = inv_l
+        
     # Use edge weights as edge lengths in spring_layout
     pos = nx.spring_layout(G, weight="inv_l")
     nx.draw(G, pos, with_labels=True, node_color='lightblue',
             edge_color='gray', node_size=node_sizes*10)
+    
     plt.title("Connectivity Graph (edge length ~ weight)")
     plt.show()
 
@@ -363,6 +374,12 @@ longest_path, max_length = get_long_path_in_graph_edgelength(G_simplified)
 
 # Now find the longest possible path within the network
 def get_long_path_in_graph_nodearea(G):
+    """
+    Find the longest path between any two nodes.
+    
+    TO DO: 
+    - OR, find the longest path, starting from any node that touches the shoot.
+    """
     longest_path = []
     max_length = 0
     # check all pairs of nodes
