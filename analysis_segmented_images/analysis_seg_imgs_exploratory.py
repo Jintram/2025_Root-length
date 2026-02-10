@@ -415,6 +415,13 @@ plt.title("Longest Path Highlighted in Skeleton")
 %matplotlib qt
 plt.show()
     
+
+# ISSUE, LONGEST BRANCH DOESN'T ATTACH TO SHOOT
+# --> SEE NOTES IN OBSIDIAN
+    
+    
+    
+    
     
 def assign_distances_edges(G, labeled_skeleton):
     """
