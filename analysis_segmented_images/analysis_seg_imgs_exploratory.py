@@ -16,7 +16,7 @@ from skimage import morphology
 from skimage.measure import regionprops
 import networkx as nx
 # from skan import Skeleton, summarize
-from scipy.ndimage import convolve
+from scipy.ndimage import convolve, distance_transform_edt
 
 # custom libs
 import custom_functions.remove_large_objects as cflo
@@ -30,15 +30,15 @@ cmap_random_rainbow = ListedColormap(colors_rainbow)
 
 # Let's set a custom color scheme
 custom_colors_plantclasses = \
-    [   # background black
+    [   # 0 = background black
         '#000000', 
-        # shoot light green
+        # 1 = shoot light green
         '#90EE90',
-        # root white
+        # 2 = root white
         '#FFFFFF', 
-        # seed brown
+        # 3 = seed brown
         '#A52A2A', 
-        # leaf darkgreen
+        # 4 = leaf darkgreen
         '#006400' 
         ]
 # Create a custom cmap
@@ -116,21 +116,29 @@ mask_firstroot_realplant = mask_firstroot
     # to see if I can deal with that..
 
 # Load test files
-testmask_file_path = "example_files/idealized_root_masks/root_mask_1.tif"
-testmask_file_path = "example_files/idealized_root_masks/root_mask_2.tif"
+testmask_file_path = "/Users/m.wehrens/Documents/git_repos/_UVA/_Projects-bioDSC/2025_Root-length/example_files/idealized_root_masks/root_mask_1_labeled.npy"
+testmask_file_path = "/Users/m.wehrens/Documents/git_repos/_UVA/_Projects-bioDSC/2025_Root-length/example_files/idealized_root_masks/root_mask_2_labeled.npy"
 # Load it
-mask_firstroot = plt.imread(testmask_file_path)
+mask_labeled_firstroot = np.load(testmask_file_path)
+mask_firstroot  = mask_labeled_firstroot == 2
+mask_firstshoot = mask_labeled_firstroot == 1
+# plt.imshow(mask_labeled_firstroot)
+# plt.imshow(mask_firstshoot)
 
 # Or use real plant input
+# TO DO: currently, i didn't isolate the labeled mask yet per plant, this needs
+# to be done in update (for now optimizing test images)
 mask_firstroot = mask_firstroot_realplant
 
 # now skeletonize this
 skeleton_firstroot = morphology.skeletonize(mask_firstroot)
 
 # side-to-side comparison of mask_firstroot and skeleton_firstroot
+# %matplotlib inline
 fig, axs = plt.subplots(1, 2)
 axs[0].imshow(mask_firstroot)
 axs[1].imshow(skeleton_firstroot)
+# plt.show()
 
 # save the skeleton to a tiff image
 tiff.imwrite(dir_output_exploratory + "skeleton_firstroot.tif",
@@ -372,6 +380,26 @@ def get_long_path_in_graph_edgelength(G):
 
 longest_path, max_length = get_long_path_in_graph_edgelength(G_simplified)
 
+
+def find_branch_close_other(labeled_mask, mask_other):
+    """
+    A function that will find the segment that's closest to another mask
+    This is intended to find the segment of the root that is closest to the 
+    shoot, to use as a starting point for the longest path search.
+    """
+    # mask_other = mask_firstshoot
+    # labeled_mask = labeled_skeleton_no_branchpoints
+
+    # Generate a distance map based on the other mask
+    distance_map = distance_transform_edt(~mask_other)
+    # plt.imshow(distance_map)
+
+
+    XXXXXX WORKING HERE
+    
+    return closest_node
+
+
 # Now find the longest possible path within the network
 def get_long_path_in_graph_nodearea(G):
     """
@@ -415,9 +443,13 @@ plt.title("Longest Path Highlighted in Skeleton")
 %matplotlib qt
 plt.show()
     
+# plt.imshow(labeled_skeleton_no_branchpoints)
 
 # ISSUE, LONGEST BRANCH DOESN'T ATTACH TO SHOOT
 # --> SEE NOTES IN OBSIDIAN
+
+# NOTE THAT labeled_skeleton_no_branchpoints IS INCONVENIENTLY NAMED,
+# AS BRANCH POINTS AND END POINTS ARE RE-ADDED LATER
     
     
     
