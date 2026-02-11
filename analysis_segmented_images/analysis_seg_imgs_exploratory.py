@@ -18,6 +18,7 @@ import networkx as nx
 # from skan import Skeleton, summarize
 from scipy.ndimage import convolve, distance_transform_edt
 
+
 # custom libs
 import custom_functions.remove_large_objects as cflo
     # import importlib; importlib.reload(cflo)
@@ -150,13 +151,13 @@ tiff.imwrite(dir_output_exploratory + "skeleton_firstroot.tif",
 
 # First let's remove all pixels that touch more than 2 other pixels
 # Define a kernel that sums the 8 neighbors
-kernel = np.array([[1, 1, 1],
-                   [1, 0, 1],
-                   [1, 1, 1]])
+KERNEL_NEIGHBOR_COUNT = np.array([[1, 1, 1],
+                                  [1, 0, 1],
+                                  [1, 1, 1]])
 
 # Calculate the number of neighbors for each pixel
 # We convert the boolean skeleton to integer (0/1) for the convolution
-neighbor_counts = convolve(skeleton_firstroot.astype(int), kernel, mode='constant', cval=0)
+neighbor_counts = convolve(skeleton_firstroot.astype(int), KERNEL_NEIGHBOR_COUNT, mode='constant', cval=0)
 
 # Get the coordinates of pixels with >2 neighbor count
 branchpoint_coords = np.column_stack(np.where((skeleton_firstroot) & (neighbor_counts > 2)))
@@ -394,24 +395,45 @@ def find_branch_close_other(labeled_mask, mask_other):
     distance_map = distance_transform_edt(~mask_other)
     # plt.imshow(distance_map)
 
-
-    XXXXXX WORKING HERE
+    # set points outside the labeled mask to inf
+    distance_map[labeled_mask==0] = np.inf
+        # plt.imshow(distance_map)
+        
+    # now get the coordinate of the pixel with the smallest distance
+    closest_pixel = np.unravel_index(np.argmin(distance_map), distance_map.shape)    
+    # now get the label corresponding to that lowest value
+    closest_label = labeled_mask[closest_pixel]
     
-    return closest_node
+    return closest_label
 
+# create a picture with the closest label highlighted
+closest_label = find_branch_close_other(labeled_skeleton_no_branchpoints, mask_firstshoot)
+highlighted_mask = (labeled_skeleton_no_branchpoints>0).astype(int)
+highlighted_mask[labeled_skeleton_no_branchpoints == closest_label] = 2
+# %matplotlib qt
+# plt.imshow(highlighted_mask, cmap='viridis')
 
 # Now find the longest possible path within the network
-def get_long_path_in_graph_nodearea(G):
+def get_long_path_in_graph_nodearea(G, source=None):
     """
     Find the longest path between any two nodes.
     
     TO DO: 
     - OR, find the longest path, starting from any node that touches the shoot.
     """
+    
     longest_path = []
     max_length = 0
+    
+    # if source is provided, only check paths starting from that source node,
+    # otherwise, check all pairs of nodes
+    if source is not None:
+        source_nodes = [source]
+    else:
+        source_nodes = G.nodes
+    
     # check all pairs of nodes
-    for source in G.nodes:
+    for source in source_nodes:
         for target in G.nodes:
             if source != target:
                 path = nx.shortest_path(G, source=source, target=target, weight='length')
@@ -427,16 +449,21 @@ def get_long_path_in_graph_nodearea(G):
     
     return longest_path, max_length
 
-longest_path, max_length = get_long_path_in_graph_edgelength(G_simplified)
-longest_path, max_length = get_long_path_in_graph_nodearea(G)
+# longest_path, max_length = get_long_path_in_graph_edgelength(G_simplified)
+longest_path, max_length = get_long_path_in_graph_nodearea(G, source=closest_label)
 
 # For reference, print G again
 visualize_graph_nodesize(G)
 
+# create a mask with the longest path through segments 
+skeleton_longest_path = np.zeros_like(labeled_skeleton_no_branchpoints)
+for node_id in longest_path:
+    skeleton_longest_path[labeled_skeleton_no_branchpoints == node_id] = 1
+# plt.imshow(skeleton_longest_path)
+
 # now use the ids in longest_path to highlight that path in the original skeleton image
 skeleton_highlighted = skeleton_firstroot*1
-for node_id in longest_path:
-    skeleton_highlighted[labeled_skeleton_no_branchpoints == node_id] = 2
+skeleton_highlighted[skeleton_longest_path == 1] = 2
 plt.figure()
 plt.imshow(skeleton_highlighted, cmap='viridis')
 plt.title("Longest Path Highlighted in Skeleton")
@@ -451,23 +478,71 @@ plt.show()
 # NOTE THAT labeled_skeleton_no_branchpoints IS INCONVENIENTLY NAMED,
 # AS BRANCH POINTS AND END POINTS ARE RE-ADDED LATER
     
+# Kernel with distances for 8-connectivity (diagonal neighbors have distance sqrt(2))    
+# The distances are divided by 2, because otherwise lengths are counted twice.
+DISTANCE_KERNEL = np.array([[np.sqrt(2), 1, np.sqrt(2)],
+                            [1, 0, 1],
+                            [np.sqrt(2), 1, np.sqrt(2)]]) / 2
+
     
-    
-    
-    
-def assign_distances_edges(G, labeled_skeleton):
+def get_length_segment(the_mask, distance_kernel = DISTANCE_KERNEL):
     """
-    To facilitate calculating the distance between any two nodes, this 
-    function will add distances to both nodes and edges.
-    - Nodes >1px will be assigned length based <algorithm X>
-        --> chatgpt suggested finding neighboring pixels for all
-        pixels in segmenet, and calculate all neighbor lengths..
-        seems also a bit elaborate
-    - Nodes of 1 px will be assigned a length of 0
-    - Edges between two pixels will be either given 
-        - l = 1 (hor/vertical connection)
-        - l = sqrt(2) (diagonal connection)
-    """    
+    Assuming that the mask provides pixels which all have >0 neighbors <3, 
+    and form one continuous structure, calculate the length of the line
+    defined by the structure in the mask.
+    
+    For each pixel, distance to its one or two neighboring pixels is 
+    determined using convolution with a distance kernel.
+    
+    test_mask = np.array([[ 0, 0, 1, 0, 0],
+                          [ 0, 0, 1, 0, 0],
+                          [ 0, 1, 0, 0, 1],
+                          [ 0, 0, 1, 1, 0]])
+    # expected length (midpoints)
+    # 1 + np.sqrt(2) + np.sqrt(2) + 1 + np.sqrt(2) = 6.242640687119285
+    """
+    # the_mask = test_mask
+    # distance_kernel = DISTANCE_KERNEL
+    
+    # first test wether all pixels are indeed only connected to <3 neighbors
+    neighbor_counts = convolve(the_mask.astype(int),
+                               KERNEL_NEIGHBOR_COUNT, 
+                               mode='constant', cval=0)
+    if (np.any(neighbor_counts[the_mask>0] > 2) or
+        np.any(neighbor_counts[the_mask>0] < 1)):
+        raise ValueError("Mask is not a valid line (isolated pixels or connected to >2 neighbors)")
+
+    # now for each pixel, get the total distance to all neighbors
+    neighbor_distances = convolve(the_mask.astype(float),
+                                  distance_kernel,
+                                  mode='constant',
+                                  cval=0)
+    neighbor_distances[the_mask==0] = 0
+
+    # now sum up the distances for all pixels in the mask
+    line_length = np.sum(neighbor_distances[the_mask>0])
+    return line_length
+
+# Now calculate the length of the root
+length_root = get_length_segment(skeleton_longest_path)
+
+# plt.imshow(skeleton_firstroot)
+
+# %%
+    
+# def assign_distances_edges(G, labeled_skeleton):
+#     """
+#     To facilitate calculating the distance between any two nodes, this 
+#     function will add distances to both nodes and edges.
+#     - Nodes >1px will be assigned length based <algorithm X>
+#         --> chatgpt suggested finding neighboring pixels for all
+#         pixels in segment, and calculate all neighbor lengths..
+#         seems also a bit elaborate
+#     - Nodes of 1 px will be assigned a length of 0
+#     - Edges between two pixels will be either given 
+#         - l = 1 (hor/vertical connection)
+#         - l = sqrt(2) (diagonal connection)
+#     """    
 
 
 # %%
