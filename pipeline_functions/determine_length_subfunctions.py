@@ -1,13 +1,11 @@
 
-#%% 
 
-# 
-import sys
-dir_output_exploratory = "/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/ANALYSIS/exploratory/"
-sys.path.append('/Users/m.wehrens/Documents/git_repos/_UVA/_Projects-bioDSC/2025_Root-length')
-import tifffile as tiff
+# Functions that allow length calculation for an individual plant
+# This assumes you provide an image that contains only one 
+# individual plant segmentation.
 
-#%% libs #######################################################################
+################################################################################
+#%% libs 
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -23,119 +21,14 @@ from scipy.ndimage import convolve, distance_transform_edt
 import custom_functions.remove_large_objects as cflo
     # import importlib; importlib.reload(cflo)
 
-# generate a randomly shuffled rainbow categorical color map
-colors_rainbow = plt.cm.rainbow(np.linspace(0, 1, 255))
-np.random.shuffle(colors_rainbow)
-colors_rainbow = np.vstack(([0, 0, 0, 1], colors_rainbow))
-cmap_random_rainbow = ListedColormap(colors_rainbow)
 
-# Let's set a custom color scheme
-custom_colors_plantclasses = \
-    [   # 0 = background black
-        '#000000', 
-        # 1 = shoot light green
-        '#90EE90',
-        # 2 = root white
-        '#FFFFFF', 
-        # 3 = seed brown
-        '#A52A2A', 
-        # 4 = leaf darkgreen
-        '#006400' 
-        ]
-# Create a custom cmap
+    
+################################################################################
+#%% functions to determine length
 
-cmap_plantclasses = ListedColormap(custom_colors_plantclasses)
-
-cm_to_inch = 1/2.54
-
-#%% ############################################################################
-
-# assuming we have some input
-img_mask = \
-    np.load("/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/ANALYSIS/202510/plots/fullimages_predictions_all/predictedmask_idx001.npy")
-
-# now plot
-plt.imshow(img_mask, cmap=cmap_plantclasses)
-
-# binary mask
-img_mask_binary = img_mask>0
-plt.imshow(img_mask_binary)
-
-# Let's say a typical plant is ±400 pixels high, and 5 pixels wide. That's
-# 2000 px area;
-TYPICAL_PLANT_SIZE = 2000
-MIN_SIZE = TYPICAL_PLANT_SIZE/10
-MAX_SIZE = TYPICAL_PLANT_SIZE*10
-# remove small objects from the mask
-img_mask_cleaned = morphology.remove_small_objects(img_mask_binary, min_size=MIN_SIZE)
-# remove large objects from the mask
-img_mask_cleaned = cflo.remove_large_objects(img_mask_cleaned, max_size=MAX_SIZE)
-plt.imshow(img_mask_cleaned)
-
-# now clean the original mask with labels
-img_mask[~img_mask_cleaned] = 0
-plt.imshow(img_mask, cmap=cmap_plantclasses)
-
-
-# %% Now let's look whether I can perform some skeletonization
-
-# First, isolate the root segments
-img_mask_roots = img_mask==2
-plt.imshow(img_mask_roots)
-
-# again, remove small parts
-mask_roots_cleaned = morphology.remove_small_objects(img_mask_roots, min_size=MIN_SIZE)
-plt.imshow(mask_roots_cleaned)
-
-# now let's get labeled map and regionprops
-label_img_cleanroots = morphology.label(mask_roots_cleaned)
-regions_cleanroots = regionprops(label_img_cleanroots)
-
-# now, isolate the first root bbox imgage
-first_root = regions_cleanroots[0]
-minr, minc, maxr, maxc = first_root.bbox
-mask_firstroot = mask_roots_cleaned[minr:maxr, minc:maxc]
-
-plt.imshow(mask_firstroot)
-
-mask_firstroot_realplant = mask_firstroot
-
-
-
-
-# %% Now comes the challenge
-
-# I want to be able to deal with curvy roots
-# I want to ignore side-branches
-# Probably I want to fit a spline locally
-# But how do I determine what the main direction of the root is?
-    # --> perhpas some opening/closing to determine the main path
-    # nevertheless, if there are "real" side branches, how would I be able to
-    # remove those?
-    # 
-    # Maybe also create an idealized root mask, with some challenges in it,
-    # to see if I can deal with that..
-
-# EITHER #####
-
-# Load test files
-testmask_file_path = "/Users/m.wehrens/Documents/git_repos/_UVA/_Projects-bioDSC/2025_Root-length/example_files/idealized_root_masks/root_mask_1_labeled.npy"
-testmask_file_path = "/Users/m.wehrens/Documents/git_repos/_UVA/_Projects-bioDSC/2025_Root-length/example_files/idealized_root_masks/root_mask_2_labeled.npy"
-# Load it
-mask_labeled_firstroot = np.load(testmask_file_path)
-mask_firstroot  = mask_labeled_firstroot == 2
-mask_firstshoot = mask_labeled_firstroot == 1
-# plt.imshow(mask_labeled_firstroot)
-# plt.imshow(mask_firstshoot)
-
-# OR #####
-
-# Or use real plant input
-# TO DO: currently, i didn't isolate the labeled mask yet per plant, this needs
-# to be done in update (for now optimizing test images)
-mask_firstroot = mask_firstroot_realplant
-
-#####
+# remember to only take largest area into account
+ 
+    
 
 # now skeletonize this
 skeleton_firstroot = morphology.skeletonize(mask_firstroot)
@@ -148,8 +41,8 @@ axs[1].imshow(skeleton_firstroot)
 # plt.show()
 
 # save the skeleton to a tiff image
-tiff.imwrite(dir_output_exploratory + "skeleton_firstroot.tif",
-            skeleton_firstroot.astype(np.uint8)*255)
+# tiff.imwrite(dir_output_exploratory + "skeleton_firstroot.tif",
+#            skeleton_firstroot.astype(np.uint8)*255)
 
 
 
@@ -188,6 +81,10 @@ plt.savefig(dir_output_exploratory + "skeleton_no_branchpoints.png", dpi=300)
 %matplotlib qt
 plt.show()
 
+################################################################################
+
+# NOTE ADDED LATER: MAYBE TRY THIS FIRST WITHOUT SEPARATELY LABELING THE 
+# ENDPOINT COORDINATES? NOT SURE WHAT I NEED THOSE FOR.. 
 # now convert the mask with no branchpoints to labeled mask
 labeled_skeleton_no_branchpoints = morphology.label(skeleton_no_branchpoints)
 max_label = labeled_skeleton_no_branchpoints.max()
@@ -195,6 +92,8 @@ max_label = labeled_skeleton_no_branchpoints.max()
 # and labels, starting at max_label+1, to each pixel
 for idx, coord in enumerate(np.vstack((branchpoint_coords, endpoint_coords))):
     labeled_skeleton_no_branchpoints[coord[0], coord[1]] = idx + max_label + 1
+
+################################################################################
 
 # for plotting purposes
 # Get coordinates of all non-zero pixels
@@ -227,10 +126,8 @@ plt.savefig(dir_output_exploratory + "labeled_skeleton_no_branchpoints_with_labe
 %matplotlib qt
 plt.show()
 
+################################################################################
 
-# %%
-
-print("test")
 
 # %% 
 # this has worked neatly, now, loop over each of the labels, and gather any 
@@ -276,6 +173,8 @@ for label_id in unique_labels:
 
 print(f"Graph created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges.")
 
+################################################################################
+
 # Visualize the graph abstractly
 def visualize_graph_nodesize(G):
     fig, ax = plt.subplots()
@@ -290,6 +189,7 @@ def visualize_graph_nodesize(G):
 fig, ax = visualize_graph_nodesize(G)
 fig.savefig(dir_output_exploratory + "connectivity_graph_nodesize.png", dpi=300)
 
+################################################################################
 
 # Now simplify the graph
 # NOTE: I'm reviewing the code, and should check why this is necessary. 
@@ -359,6 +259,8 @@ def visualize_graph_edgelength(G):
     plt.title("Connectivity Graph (edge length ~ weight)")
     plt.show()
 
+################################################################################
+
 # get the simplified graph
 G_simplified = simplify_graph_by_contracting_degree2_nodes(G)
 # Now visualize it again
@@ -387,6 +289,7 @@ def get_long_path_in_graph_edgelength(G):
 
 longest_path, max_length = get_long_path_in_graph_edgelength(G_simplified)
 
+################################################################################
 
 def find_branch_close_other(labeled_mask, mask_other):
     """
@@ -418,6 +321,8 @@ highlighted_mask = (labeled_skeleton_no_branchpoints>0).astype(int)
 highlighted_mask[labeled_skeleton_no_branchpoints == closest_label] = 2
 # %matplotlib qt
 # plt.imshow(highlighted_mask, cmap='viridis')
+
+################################################################################
 
 # Now find the longest possible path within the network
 def get_long_path_in_graph_nodearea(G, source=None):
@@ -461,11 +366,15 @@ longest_path, max_length = get_long_path_in_graph_nodearea(G, source=closest_lab
 # For reference, print G again
 visualize_graph_nodesize(G)
 
+################################################################################
+
 # create a mask with the longest path through segments 
 skeleton_longest_path = np.zeros_like(labeled_skeleton_no_branchpoints)
 for node_id in longest_path:
     skeleton_longest_path[labeled_skeleton_no_branchpoints == node_id] = 1
 # plt.imshow(skeleton_longest_path)
+
+################################################################################
 
 # now use the ids in longest_path to highlight that path in the original skeleton image
 skeleton_highlighted = skeleton_firstroot*1
@@ -478,12 +387,8 @@ plt.show()
     
 # plt.imshow(labeled_skeleton_no_branchpoints)
 
-# ISSUE, LONGEST BRANCH DOESN'T ATTACH TO SHOOT
-# --> SEE NOTES IN OBSIDIAN
+################################################################################
 
-# NOTE THAT labeled_skeleton_no_branchpoints IS INCONVENIENTLY NAMED,
-# AS BRANCH POINTS AND END POINTS ARE RE-ADDED LATER
-    
 # Kernel with distances for 8-connectivity (diagonal neighbors have distance sqrt(2))    
 # The distances are divided by 2, because otherwise lengths are counted twice.
 DISTANCE_KERNEL = np.array([[np.sqrt(2), 1, np.sqrt(2)],
@@ -541,88 +446,4 @@ skeleton_area = np.sum(skeleton_longest_path>0)
 
 # %%
     
-# def assign_distances_edges(G, labeled_skeleton):
-#     """
-#     To facilitate calculating the distance between any two nodes, this 
-#     function will add distances to both nodes and edges.
-#     - Nodes >1px will be assigned length based <algorithm X>
-#         --> chatgpt suggested finding neighboring pixels for all
-#         pixels in segment, and calculate all neighbor lengths..
-#         seems also a bit elaborate
-#     - Nodes of 1 px will be assigned a length of 0
-#     - Edges between two pixels will be either given 
-#         - l = 1 (hor/vertical connection)
-#         - l = sqrt(2) (diagonal connection)
-#     """    
-
-
-# %%
-
-def skeleton_to_graph(skeleton_img):
-    """
-    Converts a binary skeletonized image into a NetworkX graph.
-    
-    Nodes correspond to branch points or endpoints.
-    Edges correspond to the segments connecting them.
-    Edge weights ('weight') represent the number of pixels in the segment (Euclidean length is also available in skan).
-    
-    Parameters:
-    -----------
-    skeleton_img : np.ndarray
-        Binary skeletonized image.
-        
-    Returns:
-    --------
-    G : networkx.MultiGraph
-        Graph representation of the skeleton.
-    """
-    
-    # Use skan to analyze the skeleton
-    skel = Skeleton(skeleton_img)
-    
-    # Create a graph
-    # skan provides a summary which is very useful, but we can also build a graph directly
-    # The skan.Skeleton object already contains a graph representation in CSR format, 
-    # but let's convert it to a more standard NetworkX graph for easier manipulation.
-    
-    # Get the summary dataframe which lists all branches (edges)
-    branch_data = summarize(skel)
-    
-    G = nx.MultiGraph()
-    
-    # Iterate over the branches identified by skan
-    for index, row in branch_data.iterrows():
-        # node IDs in skan are based on the flattened index of the pixel in the image
-        src_node = int(row['node-id-src'])
-        dst_node = int(row['node-id-dst'])
-        
-        # branch-distance is the euclidean length, branch-type tells us about the topology
-        # We can also use 'image-coord-src-0', 'image-coord-src-1' for coordinates if needed
-        
-        # The number of pixels is roughly the branch distance, but skan calculates 
-        # Euclidean distance along the path. If you strictly want pixel count:
-        # The skan path coordinates are available via skel.path_coordinates(index)
-        path_coords = skel.path_coordinates(index)
-        pixel_count = path_coords.shape[0]
-        
-        # Add edge with attributes
-        G.add_edge(src_node, dst_node, 
-                   weight=pixel_count, 
-                   euclidean_length=row['branch-distance'],
-                   branch_id=index)
-        
-        # Add node attributes (coordinates)
-        # We only need to do this once per node, but overwriting is fine
-        src_coords = (row['image-coord-src-0'], row['image-coord-src-1'])
-        dst_coords = (row['image-coord-dst-0'], row['image-coord-dst-1'])
-        
-        G.nodes[src_node]['pos'] = src_coords
-        G.nodes[dst_node]['pos'] = dst_coords
-        
-    return G, branch_data
-
-# Example usage:
-# G, df = skeleton_to_graph(skeleton_firstroot)
-# print(f"Graph has {len(G.nodes)} nodes and {len(G.edges)} edges.")
-
-
+# (removed some stuff here)
