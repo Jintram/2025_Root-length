@@ -491,6 +491,10 @@ def get_length_segment(the_mask, distance_kernel = DISTANCE_KERNEL):
     and form one continuous structure, calculate the length of the line
     defined by the structure in the mask.
     
+    By construction, the other functions should have created a line
+    conforming to the constraints above (pixels with >2 neighbors
+    are isolated and processed separately).
+    
     For each pixel, distance to its one or two neighboring pixels is 
     determined using convolution with a distance kernel.
     
@@ -525,6 +529,7 @@ def get_length_segment(the_mask, distance_kernel = DISTANCE_KERNEL):
 
 # Now calculate the length of the root
 length_root = get_length_segment(skeleton_longest_path)
+skeleton_area = np.sum(skeleton_longest_path>0)
 
 # plt.imshow(skeleton_firstroot)
 
