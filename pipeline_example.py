@@ -46,6 +46,10 @@ plprep.plot_mask_and_bboxes(img_mask_clean, selected_bboxes)
 # %% Now run a plant through the analysis
 # afterwards, show each of the longest lines projected back on the plants
 
+img_plant1_test = list_img_isolatedplants[selection_of_QCpassed_plants][0]
+img_mask_labeled = img_plant1_test
+plt.imshow(img_mask_labeled, cmap=plutils.cmap_plantclasses)
 
 
 
+# %%

@@ -63,6 +63,23 @@ def find_individual_plants(img_mask, lbl_of_interest=2, min_count=5):
     and in addition a corresponding list of individually recognized root
     areas within each plant. (Plants with multiple root areas are likely
     invalid segmentations.)
+    
+    This function doesn't throw out plants, but you can easily select
+    individuals later based on img_mask_bbox_rootcount.
+    
+    Input parameters:
+    - img_mask: the mask to analyze, with 0 = background, 1 = hypocotyl, 2 = root.
+    - lbl_of_interest: the label in the mask that corresponds to the roots (or another
+      class of interest.
+    - min_count: the minimum area (in pixels) for a root to be counted as a 
+      separate root.
+    Output parameters:
+    - list_img_isolatedplants: a list of images, each containing only one plant (with
+    the rest of the image set to 0).
+    - img_mask_bbox_rootcount: a list of counts of root areas for each plant.
+    - img_mask_rprops: the regionprops for the simplified mask, which can be 
+      used to plot bboxes later.
+    
     Also return regionprops for the simplified mask.
     """
     # img_mask = img_mask_clean.copy(); lbl_of_interest=2; min_count = 5
