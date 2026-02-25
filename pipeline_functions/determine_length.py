@@ -22,7 +22,7 @@ from skimage.measure import label, regionprops
 from matplotlib import pyplot as plt
 from matplotlib.colors import ListedColormap
 
-import pipeline_functions.utils as utils
+import pipeline_functions.utils as plutils
 
 # Sums the 8 neighbors around one pixel
 KERNEL_NEIGHBOR_COUNT = np.array(
@@ -58,6 +58,9 @@ class RootSample:
     longest_path: list[int] | None = None
     length_pixels: float | None = None
     length_mm: float | None = None
+    
+    # position of the bbox in the original image
+    bbox: tuple[int, int, int, int] | None = None
     
     mask_longest_root_path: np.ndarray | None = None
 
@@ -265,7 +268,7 @@ def build_segment_graph(sample: RootSample) -> RootSample:
     graph.add_nodes_from(unique_labels)
 
     # Dilation element to check all direct neighbors
-    structure_all8neihbors = morphology.square(3)
+    structure_all8neihbors = morphology.footprint_rectangle((3, 3))
 
     # Loop over each segment
     for label_id in unique_labels:
@@ -401,7 +404,7 @@ def plot_original_and_length(sample):
     fig, axs = plt.subplots(1, 2)
 
     # Show original/root mask
-    axs[0].imshow(sample.plant_mask, cmap=utils.cmap_plantclasses)
+    axs[0].imshow(sample.plant_mask, cmap=plutils.cmap_plantclasses)
 
     # Overlay the skeleton, colored in dark grey
     axs[0].imshow(sample.root_skeleton, cmap=ListedColormap(['none', 'blue']),
@@ -413,7 +416,7 @@ def plot_original_and_length(sample):
     
     # Now same but for the root
     r0, c0, r1, c1 = return_bbox_foreground(sample.root_mask)
-    axs[1].imshow(sample.root_mask[r0:r1, c0:c1], cmap=ListedColormap(['black', utils.custom_colors_plantclasses[2]]))
+    axs[1].imshow(sample.root_mask[r0:r1, c0:c1], cmap=ListedColormap(['black', plutils.custom_colors_plantclasses[2]]))
     axs[1].imshow(sample.root_skeleton[r0:r1, c0:c1], cmap=ListedColormap(['none', 'blue']),
                 alpha=(sample.root_skeleton[r0:r1, c0:c1] > 0) * 1.0)
     axs[1].imshow(sample.mask_longest_root_path[r0:r1, c0:c1], cmap=ListedColormap(["none", "red"]),
@@ -483,6 +486,77 @@ def plot_distance_graph(sample):
     
     return fig, ax
 
+# %%
+
+def plot_all_plants_projected(
+        sample_image: np.ndarray,
+        plant_results,
+        figsize: tuple[int, int] = (12, 12)):
+    """
+    Make overview plot.
+    
+    Run determine_length() for each individual plant image and project all
+    traced centerlines + lengths back onto the original sample image.
+    """
+    
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.imshow(sample_image, cmap=plutils.cmap_plantclasses)
+    #ax.set_title("All plants projected on sample image", fontsize=13, pad=10)
+    #ax.axis("off")
+
+    ax.autoscale(False)
+
+    colors = plt.cm.tab20(np.linspace(0, 1, len(plant_results)))
+
+    for idx, (result, color) in enumerate(zip(plant_results, colors), start=1):
+        
+        # idx = 0; result = plant_results[idx]; color = colors[idx]
+        
+        # show the bbox
+        minr, minc, maxr, maxc = result.bbox
+        rect = plt.Rectangle((minc, minr), maxc - minc, maxr - minr,
+                                edgecolor='red', facecolor='none')
+        plt.gca().add_patch(rect)
+
+        # Project skeleton pixels back to full-image coordinates
+        if result.root_skeleton is not None and np.any(result.root_skeleton):
+            ax.imshow(
+            result.root_skeleton,
+            cmap=ListedColormap(["none", "gray"]),
+            alpha=(result.root_skeleton > 0) * 1.0,
+            interpolation="none",
+            extent=(minc, maxc, maxr, minr),  # project ROI back to full image
+            )
+
+        # Project longest-path pixels back to full-image coordinates
+        if result.mask_longest_root_path is not None and np.any(result.mask_longest_root_path):
+            ax.imshow(
+                result.mask_longest_root_path,
+                cmap=ListedColormap(["none", "red"]),
+                alpha=(result.mask_longest_root_path > 0) * 1.0,
+                interpolation="none",
+                extent=(minc, maxc, maxr, minr),  # project ROI back to full image
+            )
+
+        # Optional length label near each bbox
+        if result.length_pixels is not None:
+            ax.text(
+            minc,
+            minr - 3,
+            f"{result.length_pixels:.1f}px",
+            color=color,
+            fontsize=8,
+            ha="left",
+            va="bottom",
+            bbox=dict(facecolor="black", alpha=0.35, edgecolor="none", pad=1),
+            )
+    
+    # reset zoom to full image
+    ax.set_xlim(0, sample_image.shape[1])
+        
+    plt.tight_layout()
+    return fig, ax
+
 def run_default_length_pipeline(sample: RootSample) -> RootSample:
     """Run the full default sequence of novice-friendly processing steps."""
     
@@ -506,6 +580,5 @@ def run_default_length_pipeline(sample: RootSample) -> RootSample:
         sample.length_mm = sample.length_pixels * sample.pixel_size_mm
     else:
         sample.length_mm = None
-
 
     return sample
