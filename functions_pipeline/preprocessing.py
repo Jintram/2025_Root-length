@@ -8,7 +8,7 @@ import custom_functions.remove_large_objects as cflo
 from skimage.measure import label, regionprops
 
 from matplotlib import pyplot as plt
-import pipeline_functions.utils as plutils
+import functions_pipeline.utils as plutils
 
 
 ################################################################################
@@ -55,7 +55,9 @@ def plot_bboxes(img_mask, img_bboxes):
         plt.gca().add_patch(rect)
     
 
-def find_individual_plants(img_mask, lbl_of_interest=2, min_count=5):    
+def find_individual_plants(img_mask, 
+                           lbl_of_interest=2, 
+                           min_count=5):    
     """
     Find plant regions in the mask, and nr of root regions in each plant.
     
@@ -65,7 +67,7 @@ def find_individual_plants(img_mask, lbl_of_interest=2, min_count=5):
     invalid segmentations.)
     
     This function doesn't throw out plants, but you can easily select
-    individuals later based on img_mask_bbox_rootcount.
+    individuals later based on img_mask_bbox_lblcount.
     
     Input parameters:
     - img_mask: the mask to analyze, with 0 = background, 1 = hypocotyl, 2 = root.
@@ -73,16 +75,19 @@ def find_individual_plants(img_mask, lbl_of_interest=2, min_count=5):
       class of interest.
     - min_count: the minimum area (in pixels) for a root to be counted as a 
       separate root.
+      
     Output parameters:
     - list_img_isolatedplants: a list of images, each containing only one plant (with
     the rest of the image set to 0).
-    - img_mask_bbox_rootcount: a list of counts of root areas for each plant.
+    - img_mask_bbox_lblcount: a list of counts of root areas for each plant.
     - img_mask_rprops: the regionprops for the simplified mask, which can be 
       used to plot bboxes later.
     
     Also return regionprops for the simplified mask.
     """
     # img_mask = img_mask_clean.copy(); lbl_of_interest=2; min_count = 5
+    
+    nr_labels = np.max(img_mask)
     
     img_mask_simplified = img_mask>0
     img_mask_simplified_lbl = label(img_mask_simplified)
@@ -91,10 +96,10 @@ def find_individual_plants(img_mask, lbl_of_interest=2, min_count=5):
     
     # create bbox, remove other objects outside current object of interest
     # then count objects
-    img_mask_bbox_rootcount = np.zeros(len(img_mask_rprops), dtype = int)
+    img_mask_bbox_lblcount = np.zeros([len(img_mask_rprops), nr_labels], dtype=int)
     list_img_isolatedplants = np.array([None]*len(img_mask_rprops))
     for CURRENT_LABEL in range(1, len(img_mask_rprops)+1):
-        # CURRENT_LABEL = 2
+        # CURRENT_LABEL = 1
         
         # get current box 
         current_bbox = img_mask_rprops[CURRENT_LABEL-1].bbox
@@ -109,25 +114,31 @@ def find_individual_plants(img_mask, lbl_of_interest=2, min_count=5):
             # plt.imshow(current_img_lbl_bbox != CURRENT_LABEL)
             # plt.imshow(current_img_bbox)
         
-        # now count the separate instances of roots 
-        current_img_bbox_rootmask = current_img_bbox == lbl_of_interest
-            # plt.imshow(current_img_bbox_rootmask)
-        rprops = regionprops(label(current_img_bbox_rootmask))
-        # now count the roots in this image, only if size >= min_count
-        root_areas = [rprop.area for rprop in rprops if rprop.area >= min_count]
-        root_area_count = len(root_areas)
+        # For each label, count the separate areas of those labels
+        for current_lbl in np.unique(current_img_bbox):
+            if current_lbl == 0:
+                continue
+            # now count the separate instances of roots
+            current_img_bbox_rootmask = current_img_bbox == current_lbl
+                # plt.imshow(current_img_bbox_rootmask)
+            rprops = regionprops(label(current_img_bbox_rootmask))
+            # now count the roots in this image, only if size >= min_count
+            lbl_areas = [rprop.area for rprop in rprops if rprop.area >= min_count]
+            # and save
+            img_mask_bbox_lblcount[CURRENT_LABEL-1, current_lbl-1] = len(lbl_areas)
 
-        img_mask_bbox_rootcount[CURRENT_LABEL-1] = root_area_count
         list_img_isolatedplants[CURRENT_LABEL-1] = current_img_bbox
         
-    return list_img_isolatedplants, img_mask_bbox_rootcount, img_mask_rprops
+    return list_img_isolatedplants, img_mask_bbox_lblcount, img_mask_rprops
     
 def plot_separate_plants(list_img_isolatedplants, lbl_count, nr_to_plot = 10):
     """
+    Multi panel plant plot.
+    
     Create a figure with multiple panels, each corresponding to an individual
     plant, based on list_img_isolatedplants.
     """
-    # nr_to_plot = 10; lbl_count = img_mask_bbox_rootcount
+    # nr_to_plot = 10; lbl_count = img_mask_bbox_lblcount
     
     list_img_isolatedplants_toplot = \
         list_img_isolatedplants[:np.min([len(list_img_isolatedplants), nr_to_plot])]
@@ -151,6 +162,8 @@ def plot_separate_plants(list_img_isolatedplants, lbl_count, nr_to_plot = 10):
     
 def plot_mask_and_bboxes(labeled_mask, the_rprops):
     """
+    Show plant labels plus bboxes from rprops.
+    
     Simply plot a labeled mask in the plant color scheme, 
     and throw some bboxes on top using rprops.
     """

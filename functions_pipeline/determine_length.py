@@ -22,7 +22,7 @@ from skimage.measure import label, regionprops
 from matplotlib import pyplot as plt
 from matplotlib.colors import ListedColormap
 
-import pipeline_functions.utils as plutils
+import functions_pipeline.utils as plutils
 
 # Sums the 8 neighbors around one pixel
 KERNEL_NEIGHBOR_COUNT = np.array(
