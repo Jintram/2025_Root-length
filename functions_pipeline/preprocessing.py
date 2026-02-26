@@ -37,10 +37,11 @@ def clean_mask(img_mask):
     # plt.imshow(img_mask_cleaned)
 
     # now clean the original mask with labels
-    img_mask[~img_mask_cleaned] = 0
+    img_mask_new = img_mask.copy()
+    img_mask_new[~img_mask_cleaned] = 0
     # plt.imshow(img_mask, cmap=cmap_plantclasses)
     
-    return img_mask
+    return img_mask_new
 
 ################################################################################
 # %% Look for valid bboxes
@@ -115,7 +116,7 @@ def find_individual_plants(img_mask,
             # copy because otherwise will still be linked to original.. sigh..
         current_img_lbl_bbox = img_mask_simplified_lbl[
                                     current_bbox[0]:current_bbox[2],
-                                    current_bbox[1]:current_bbox[3]]
+                                    current_bbox[1]:current_bbox[3]].copy()
         
         # now remove the background from this bbox
         current_img_bbox[current_img_lbl_bbox != CURRENT_LABEL] = 0
