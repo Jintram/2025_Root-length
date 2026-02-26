@@ -92,6 +92,8 @@ def find_individual_plants(img_mask,
     """
     # img_mask = img_mask_clean.copy(); lbl_of_interest=2; min_count = 5
     
+    # plt.imshow(img_mask)
+    
     nr_labels = np.max(img_mask)
     
     img_mask_simplified = img_mask>0
@@ -109,7 +111,8 @@ def find_individual_plants(img_mask,
         # get current box 
         current_bbox = img_mask_rprops[CURRENT_LABEL-1].bbox
         current_img_bbox = img_mask[current_bbox[0]:current_bbox[2],
-                                    current_bbox[1]:current_bbox[3]]
+                                    current_bbox[1]:current_bbox[3]].copy()
+            # copy because otherwise will still be linked to original.. sigh..
         current_img_lbl_bbox = img_mask_simplified_lbl[
                                     current_bbox[0]:current_bbox[2],
                                     current_bbox[1]:current_bbox[3]]
@@ -133,6 +136,8 @@ def find_individual_plants(img_mask,
             img_mask_bbox_lblcount[CURRENT_LABEL-1, current_lbl-1] = len(lbl_areas)
 
         list_img_isolatedplants[CURRENT_LABEL-1] = current_img_bbox
+        
+    # plt.imshow(img_mask)
         
     return list_img_isolatedplants, img_mask_bbox_lblcount, img_mask_rprops
     

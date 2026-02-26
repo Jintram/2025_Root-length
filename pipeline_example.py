@@ -27,6 +27,10 @@ df_filelist, metadata_toseg_filepath = \
     )
     # directory_inputfiles = DIR_INPUTFILES; directory_outputfiles = DIR_OUTPUTFILES
 
+# find plant with id 250502_OY_09
+matching_idx = df_filelist.index[df_filelist["filename"].str.contains("250502_OY_09", na=False)]
+print(matching_idx.tolist())
+
 # Run the analysis
 plap.analyze_all_plates(df_filelist=df_filelist, 
                         output_dir=DIR_OUTPUTFILES)

@@ -65,6 +65,8 @@ def analyze_plate(curr_file):
 
     # Clean the mask
     img_mask_clean = plprep.clean_mask(img_mask)
+        # plt.imshow(img_mask)
+        # plt.imshow(img_mask_clean)
     
     # Find the plants
     list_img_indivplants, sel_plants, img_mask_rprops = \
@@ -134,13 +136,14 @@ def analyze_plate(curr_file):
         index=False, sep="\t"
         )
         
-# %% runner
+# %% runners
 
 def analyze_all_plates(df_filelist, output_dir):
 
     time_taken = []
     for file_idx in range(len(df_filelist)):
         # file_idx = 37
+        # file_idx = 462
         
         # Get current time
         start_time = time.time()
@@ -162,7 +165,7 @@ def analyze_all_plates(df_filelist, output_dir):
               "\nAverage time: {:.2f} seconds".format(np.mean(time_taken)))
         
 def generate_df_all(df_filelist, datadir):
-    """Loop over all files, load dataframes, merge them""""
+    """Loop over all files, load dataframes, merge them"""
     
     list_dfs = []
     for file_idx in range(len(df_filelist)):
