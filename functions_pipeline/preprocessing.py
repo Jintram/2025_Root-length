@@ -2,6 +2,8 @@
 ################################################################################
 # %%
 
+import os
+
 import numpy as np
 from skimage import morphology
 import custom_functions.remove_large_objects as cflo
@@ -9,6 +11,9 @@ from skimage.measure import label, regionprops
 
 from matplotlib import pyplot as plt
 import functions_pipeline.utils as plutils
+
+# %matplotlib inline
+# %matplotlib qt
 
 
 ################################################################################
@@ -160,7 +165,7 @@ def plot_separate_plants(list_img_isolatedplants, lbl_count, nr_to_plot = 10):
     plt.tight_layout()
     plt.show()
     
-def plot_mask_and_bboxes(labeled_mask, the_rprops):
+def plot_mask_and_bboxes(labeled_mask, the_rprops, curr_file=None):
     """
     Show plant labels plus bboxes from rprops.
     
@@ -168,14 +173,30 @@ def plot_mask_and_bboxes(labeled_mask, the_rprops):
     and throw some bboxes on top using rprops.
     """
     
+    # initialize figure
+    plt.figure(figsize=(10/2.54, 10/2.54))
+    
+    # plot the plate
     plt.imshow(labeled_mask, cmap=plutils.cmap_plantclasses)
     
-    for rprop in the_rprops:
+    for idx, rprop in enumerate(the_rprops):
         minr, minc, maxr, maxc = rprop.bbox
+        # outline bbox
         rect = plt.Rectangle((minc, minr), maxc - minc, maxr - minr,
                              edgecolor='red', facecolor='none')
         plt.gca().add_patch(rect)
+        # add plant label
+        plt.text(maxc, minr, str(idx), color='red', fontsize=6)
     
+    if not curr_file is None:
+        # save
+        save_path = \
+            os.path.join(curr_file.outputdir, 'lenplots/', curr_file.subdir, 
+                         curr_file.filebasename + "_indiv-plants.pdf")
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path)
+    
+    return None
     
     
 # %%

@@ -4,6 +4,11 @@
 
 import os
 
+import functions_files.filelisting as ffl
+    # import importlib; importlib.reload(ffl)
+import functions_pipeline.analyze_plate as plap
+    # import importlib; importlib.reload(plap)
+
 ################################################################################
 # %% Gather the file list df.
 
@@ -14,6 +19,7 @@ DIR_OUTPUTFILES = '/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/20260
 import functions_files.filelisting as gfl
     # import importlib; importlib.reload(gfl)
 
+# Generate list of files to analyze
 df_filelist, metadata_toseg_filepath = \
     gfl.gen_metadatafile_segfiles(
         directory_inputfiles=DIR_INPUTFILES,
@@ -21,10 +27,12 @@ df_filelist, metadata_toseg_filepath = \
     )
     # directory_inputfiles = DIR_INPUTFILES; directory_outputfiles = DIR_OUTPUTFILES
 
-FILE_IDX = 1
-basedir, subdir, filename = df_filelist.loc[FILE_IDX,['basedir', 'subdir', 'filename']]
-segfile_path1 = os.path.join(basedir, subdir, filename)
-segfile_path = segfile_path1
+# Run the analysis
+plap.analyze_all_plates(df_filelist=df_filelist, 
+                        output_dir=DIR_OUTPUTFILES)
+
+# Now make one big 
+datadir = DIR_OUTPUTFILES
 
 
 

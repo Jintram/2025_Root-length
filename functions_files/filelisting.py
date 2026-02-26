@@ -5,9 +5,25 @@
 import glob
 import os
 import pandas as pd
+import re
+
+from dataclasses import dataclass
 
 ################################################################################
 # %% 
+
+@dataclass
+class fileinfo:
+        basedir: str
+        subdir:  str
+        filename: str
+        outputdir: str | None = None
+        @property
+        def fullpath(self) -> str:
+            return os.path.join(self.basedir, self.subdir, self.filename)
+        @property
+        def filebasename(self) -> str:
+            return self.filename.replace("_seg.npz","").replace("_seg.npy","")
 
 def gen_metadatafile_segfiles(
         directory_inputfiles,
@@ -49,3 +65,5 @@ def gen_metadatafile_segfiles(
     df_filelist.to_excel(metadata_toseg_filepath, index=False)
     
     return df_filelist, metadata_toseg_filepath
+
+# %%

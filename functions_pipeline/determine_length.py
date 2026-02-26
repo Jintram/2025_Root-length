@@ -10,6 +10,8 @@ Python beginners:
 ################################################################################
 # %% Libraries
 
+import warnings
+
 from dataclasses import dataclass
 from typing import Callable, Iterable
 
@@ -221,7 +223,8 @@ def get_length_segment(the_mask, distance_kernel = DISTANCE_KERNEL):
                                mode='constant', cval=0)
     if (np.any(neighbor_counts[the_mask>0] > 2) or
         np.any(neighbor_counts[the_mask>0] < 1)):
-        raise ValueError("Mask is not a valid line (isolated pixels or connected to >2 neighbors)")
+        warnings.warn("Mask is not a valid line (isolated pixels or connected to >2 neighbors)")
+        return np.nan
 
     # now for each pixel, get the total distance to all neighbors
     neighbor_distances = convolve(the_mask.astype(float),
@@ -543,7 +546,7 @@ def plot_all_plants_projected(
             ax.text(
             minc,
             minr - 3,
-            f"{result.length_pixels:.1f}px",
+            f"({idx}) {result.length_pixels:.1f}px",
             color=color,
             fontsize=8,
             ha="left",
@@ -556,6 +559,8 @@ def plot_all_plants_projected(
         
     plt.tight_layout()
     return fig, ax
+
+# %% runner
 
 def run_default_length_pipeline(sample: RootSample) -> RootSample:
     """Run the full default sequence of novice-friendly processing steps."""
@@ -570,11 +575,13 @@ def run_default_length_pipeline(sample: RootSample) -> RootSample:
 
     # Build a graph, and find the longest path
     sample = build_segment_graph(sample)
+        # plot_distance_graph(sample)
     sample = find_start_label_close_to_shoot(sample)
     sample = get_long_path_in_graph_nodearea(sample)
     sample = build_longest_path_mask(sample)
+        # plot_original_and_length(sample)
     sample = get_length_longestpath(sample)
-
+    
     # Add distance in mm (if possible)
     if sample.pixel_size_mm is not None:
         sample.length_mm = sample.length_pixels * sample.pixel_size_mm
