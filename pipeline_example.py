@@ -35,9 +35,8 @@ print(matching_idx.tolist())
 plap.analyze_all_plates(df_filelist=df_filelist, 
                         output_dir=DIR_OUTPUTFILES)
 
-# Now make one big 
-datadir = DIR_OUTPUTFILES
-
+# Now make one big overview dataframe
+plap.generate_df_all(df_filelist, DIR_OUTPUTFILES)
 
 
 
