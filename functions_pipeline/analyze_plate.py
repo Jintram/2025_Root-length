@@ -126,10 +126,12 @@ def analyze_plate(curr_file):
     # moreover, save the data to a .csv file
     # (cols: plant index and "root length")
     df_out = pd.DataFrame({
-        'plant_index': np.arange(len(current_sample_all_plants)),
-        'length_pixels': [plant.length_pixels for plant in current_sample_all_plants],
-        'length_mm': [plant.length_mm for plant in current_sample_all_plants]
-    })    
+        "sample_identifier": curr_file.filebasename,
+        "subdir": curr_file.subdir,
+        "plant_index": np.arange(len(current_sample_all_plants)),
+        "length_pixels": [plant.length_pixels for plant in current_sample_all_plants],
+        "length_mm": [plant.length_mm for plant in current_sample_all_plants]
+    })
     output_filename = curr_file.filebasename + "_lengths.tsv"
     df_out.to_csv(
         os.path.join(output_dir_data, output_filename), 
@@ -182,7 +184,6 @@ def generate_df_all(df_filelist, datadir):
         
         # load it
         df = pd.read_csv(filepath, sep="\t")
-        df.insert(0, "sample_identifier", curr_file.filebasename)
         df.insert(0, "sample_index", file_idx)
         list_dfs.append(df)
 
