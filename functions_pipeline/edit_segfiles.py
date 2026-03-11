@@ -1,0 +1,186 @@
+
+"""
+Edit segmentation files interactively using napari.
+
+Opens each segmentation file (.npz) in a napari viewer, allowing the user
+to correct labeled masks using the default napari label-editing tools.
+
+Keybindings:
+    q - quit the loop without saving the current file
+    r - call a custom action on the mask at the current mouse position
+"""
+
+
+################################################################################
+# %% libraries
+
+import os
+import shutil
+
+import numpy as np
+import napari
+
+import functions_files.filelisting as ffl
+    # import importlib; importlib.reload(ffl)
+import custom_functions.custom_mask_action as cfca
+    # import importlib; importlib.reload(cfca)
+
+import skimage.io as skio
+
+################################################################################
+# %% helper: backup
+
+def _backup_if_needed(filepath):
+    """
+    Create a backup of the file if it hasn't been backed up before.
+    
+    The backup is saved as <filepath>.bak. If the backup already exists,
+    this function does nothing (ie only the very first version is kept).
+    """
+    
+    backup_path = filepath + '.bak'
+    if not os.path.exists(backup_path):
+        shutil.copy2(filepath, backup_path)
+        print(f"  Backup created: {backup_path}")
+    else:
+        print(f"  Backup already exists: {backup_path}")
+
+
+################################################################################
+# %% edit a single segfile
+
+def edit_segfile_single(curr_file, dir_imagefiles=None):
+    """
+    Open a single segmentation file in napari for interactive editing.
+    
+    The user can edit the labeled mask using default napari tools.
+    Keybindings:
+        q - close without saving, signal to quit the loop
+        r - call custom_mask_action at the current mouse position
+    
+    Input parameters:
+    - curr_file: a fileinfo object (from functions_files.filelisting) pointing
+      to the .npz segmentation file.
+    
+    Returns:
+    - quit_requested: bool, True if the user pressed "q" to quit.
+    """
+    
+    # Load labeled mask from the .npz file
+    segfile_path = curr_file.fullpath
+    img_mask = np.load(segfile_path)['img_pred_lbls']
+    
+    # Optionally, load the matching image file based on dir_imagefiles
+    img_original = None
+    if not dir_imagefiles is None:
+        # Generate the image path (assuming naming convention adhered)
+        imagefile_path = os.path.join(
+            dir_imagefiles, curr_file.subdir, 
+            curr_file.filename.replace('_seg.npz', '.tif').replace('_seg.npy', '.tif')
+        )
+        # Check if the image file exists, and then load
+        if os.path.exists(imagefile_path):
+            img_original = skio.imread(imagefile_path)
+            # !! ADDITIONAL EDIT SHOULD BE INSERTED HERE !! XXXX
+            # in addition, get np.load(segfile_path)['prepr_info']
+    
+    # State flags (use list to allow mutation inside nested functions)
+    quit_requested = [False]
+    save_on_close = [True]
+    
+    # Disable IPython event loop integration so that napari.run() blocks
+    # (otherwise it returns immediately in VS Code interactive windows)
+    napari.settings.get_settings().application.ipy_interactive = False
+    
+    # Open napari viewer
+    viewer = napari.Viewer(title=f"Editing: {curr_file.filename}")
+    # Add original image if available
+    if not img_original is None:
+        viewer.add_image(img_original, name='original image')
+    # Add labels 
+    labels_layer = viewer.add_labels(img_mask, name='segmentation')
+    
+    # ----- keybinding: q = quit without saving --------------------------------
+    @viewer.bind_key('q')
+    def _quit_without_saving(viewer):
+        """Close viewer without saving, and signal to quit the loop."""
+        print("  'q' pressed — closing without saving, quitting loop.")
+        quit_requested[0] = True
+        save_on_close[0] = False
+        viewer.close()
+    
+    # ----- keybinding: r = custom action --------------------------------------
+    @viewer.bind_key('r')
+    def _run_custom_action(viewer):
+        """Call the custom placeholder function at the mouse position."""
+        # Get the current mouse position in data coordinates
+        # (napari stores this as the last cursor position on the canvas)
+        mouse_pos = viewer.cursor.position
+        # Convert to integer row, col
+        row = int(round(mouse_pos[-2]))
+        col = int(round(mouse_pos[-1]))
+        print(f"  'r' pressed at position ({row}, {col})")
+        
+        # Call the custom action; it may modify the mask
+        current_data = labels_layer.data
+        modified_data = cfca.custom_mask_action(current_data, (row, col))
+        
+        # Update the labels layer with the (potentially modified) mask
+        labels_layer.data = modified_data
+    
+    # Run napari (blocks until the viewer is closed)
+    napari.run()
+    
+    # ----- after viewer is closed ---------------------------------------------
+    if save_on_close[0]:
+        # Create backup before first save
+        _backup_if_needed(segfile_path)
+        
+        # Save the (possibly edited) mask back to the .npz file
+        edited_mask = labels_layer.data
+        np.savez_compressed(segfile_path, img_pred_lbls=edited_mask)
+        print(f"  Saved: {segfile_path}")
+    else:
+        print(f"  Not saved: {segfile_path}")
+    
+    return quit_requested[0]
+
+
+################################################################################
+# %% edit all segfiles
+
+def edit_all_segfiles(df_filelist, dir_inputfiles, dir_imagefiles=None):
+    """
+    Loop over all segmentation files and open each in napari for editing.
+    
+    This iterates over the file list dataframe (same format as used by 
+    analyze_all_plates) and opens each .npz file for interactive editing.
+    
+    The loop can be terminated early by pressing "q" in the napari viewer.
+    
+    Input parameters:
+    - df_filelist: pd.DataFrame with columns 'basedir', 'subdir', 'filename'.
+    - dir_inputfiles: str, the base directory for the segmentation files
+      (used as the outputdir placeholder in fileinfo, since we save in-place).
+    """
+    
+    for file_idx in range(len(df_filelist)):
+        # file_idx = 0
+        
+        # Get file info
+        basedir, subdir, filename = \
+            df_filelist.loc[file_idx, ['basedir', 'subdir', 'filename']]
+        curr_file = ffl.fileinfo(basedir, subdir, filename, dir_inputfiles)
+        
+        print("========================================================")
+        print(f"Editing file {file_idx+1}/{len(df_filelist)}: {curr_file.fullpath}")
+        
+        # Open for editing
+        quit_requested = edit_segfile_single(curr_file, dir_imagefiles)
+        
+        if quit_requested:
+            print("Loop terminated by user (pressed 'q').")
+            break
+    
+    print("========================================================")
+    print("Done editing segmentation files.")
