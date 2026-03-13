@@ -56,6 +56,8 @@ import functions_pipeline.utils as plutils
 
 import skimage.io as skio
 from skimage.draw import line
+from skimage.measure import label as sk_label
+from scipy.ndimage import binary_dilation
 
 ################################################################################
 # %% precomputed distance grid for nearest-background search
@@ -165,10 +167,11 @@ def correct_mask_rootshootline(mask, row, col):
         print("  No background found to the right — skipping.")
         return mask
 
-    # Draw line between the two background pixels (label=5)
+    # Draw line between the two background pixels (label=5, foreground only)
     rr, cc = line(left_point[0], left_point[1],
                   right_point[0], right_point[1])
-    mask[rr, cc] = 5
+    fg = np.isin(mask[rr, cc], [1, 2, 5])
+    mask[rr[fg], cc[fg]] = 5
     print(f"  Drew line from {left_point} to {right_point}")
 
     return mask
@@ -262,11 +265,117 @@ def correct_mask_throughline(mask, row, col):
         print("  No second background pixel found — skipping.")
         return mask
 
-    # Draw line from bg1 to bg2 (label=5)
+    # Draw line from bg1 to bg2 (label=5, foreground only)
     rr, cc = line(bg1[0], bg1[1], bg2[0], bg2[1])
-    mask[rr, cc] = 5
+    fg = np.isin(mask[rr, cc], [1, 2, 5])
+    mask[rr[fg], cc[fg]] = 5
     print(f"  Drew through-line from {bg1} to {bg2}")
 
+    return mask
+
+
+################################################################################
+# %% relabel regions based on root/shoot lines
+
+def _relabel_around_line(mask, line_mask):
+    """
+    Relabel plant regions touching a single red line as shoot (1) or root (2).
+
+    Identifies connected foreground components (labels 1 and 2) that are
+    adjacent to the given red line. Computes an overall center of mass (CoM)
+    of all touching pixels, and a per-region CoM. Regions whose CoM is above
+    (lower row) the overall CoM are assigned label 1 (shoot); regions below
+    (higher row) are assigned label 2 (root).
+
+    Parameters
+    ----------
+    mask : np.ndarray
+        2D labeled mask array (modified in-place).
+    line_mask : np.ndarray
+        Boolean mask of one red-line connected component.
+
+    Returns
+    -------
+    mask : np.ndarray
+        The modified mask.
+    """
+    # Binary foreground: only labels 1 and 2 (NOT 5 / red lines)
+    fg = (mask == 1) | (mask == 2)
+        # plt.imshow(fg)
+    # Label connected components of the foreground
+    cc_labels, n_components = sk_label(fg, return_num=True, connectivity=1)
+
+    # Dilate the line mask by 1 pixel to find adjacent components
+    line_dilated = binary_dilation(line_mask, iterations=1)
+
+    # Find which component IDs touch the dilated line
+    touching_ids = set(np.unique(cc_labels[line_dilated])) - {0}
+
+    if len(touching_ids) == 0:
+        print("    No plant regions touch this line — skipping.")
+        return mask
+
+    # Build a mask of all touching pixels
+    touching_mask = np.isin(cc_labels, list(touching_ids))
+
+    # Overall CoM (row coordinate) of all touching pixels
+    touching_rows = np.where(touching_mask)[0]
+    overall_com_row = touching_rows.mean()
+
+    # Per-region: compute CoM and assign shoot (1) or root (2)
+    for comp_id in touching_ids:
+        comp_mask = (cc_labels == comp_id)
+        comp_rows = np.where(comp_mask)[0]
+        comp_com_row = comp_rows.mean()
+
+        if comp_com_row < overall_com_row:
+            # Above overall CoM → shoot
+            mask[comp_mask] = 1
+        elif comp_com_row > overall_com_row:
+            # Below overall CoM → root
+            mask[comp_mask] = 2
+        # If equal, leave unchanged
+
+    # Convert the red line itself to root label (2)
+    mask[line_mask] = 2
+
+    return mask
+
+
+def relabel_by_rootshootlines(mask):
+    """
+    Relabel all plant regions based on red boundary lines (label=5).
+
+    Finds all connected components of label 5 (red lines), and for each line
+    calls _relabel_around_line to assign adjacent plant regions as shoot (1)
+    or root (2) based on their center of mass relative to the touching pixels.
+
+    Parameters
+    ----------
+    mask : np.ndarray
+        2D labeled mask array (modified in-place).
+
+    Returns
+    -------
+    mask : np.ndarray
+        The modified mask.
+    """
+    # Find connected components of red lines (label=5)
+    red_binary = (mask == 5)
+    red_cc, n_lines = sk_label(red_binary, return_num=True)
+
+    if n_lines == 0:
+        print("  No red lines found — nothing to relabel.")
+        return mask
+
+    print(f"  Found {n_lines} red line(s). Processing...")
+
+    for line_id in range(1, n_lines + 1):
+        line_mask = (red_cc == line_id)
+        print(f"    Processing line {line_id}/{n_lines}")
+        mask = _relabel_around_line(mask, line_mask)
+
+    print("  Relabeling complete.")
     return mask
 
 
@@ -402,6 +511,15 @@ def edit_segfile_single(curr_file, dir_imagefiles=None):
         mask = correct_mask_throughline(mask, row, col)
 
         # Refresh the labels layer
+        labels_layer.data = mask
+    
+    # ----- keybinding: u = relabel by root/shoot lines ------------------------
+    @viewer.bind_key('u')
+    def _run_relabel_action(viewer):
+        """Relabel plant regions as shoot/root based on red lines."""
+        print("  'u' pressed — relabeling by root/shoot lines.")
+        mask = labels_layer.data
+        mask = relabel_by_rootshootlines(mask)
         labels_layer.data = mask
     
     # Run napari (blocks until the viewer is closed)
