@@ -10,29 +10,6 @@ Keybindings:
     r - call a custom action on the mask at the current mouse position
 """
 
-"""
-NOTES (REMOVE THIS)
-
-I want a three step procedure
-
-(1)
-clicking the "r" button, a red pixel (label = 5) is placed on the labeled layer,
-with displacement equal to the displacement of the original image. 
-then, the labeled mask is updated, it finds the closest background pixel to the 
-left of this red pixel, and the closest background pixel to the right of this
-red pixel; then a line is drawn on the labeled mask between those two background pixels,
-also in the color red.
-
-(2)
-<to be determined>
-
-(3)
-<to be determined>
-
-"""
-
-
-
 
 
 
