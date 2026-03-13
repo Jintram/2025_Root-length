@@ -10,20 +10,49 @@ Keybindings:
     r - call a custom action on the mask at the current mouse position
 """
 
+"""
+NOTES (REMOVE THIS)
+
+I want a three step procedure
+
+(1)
+clicking the "r" button, a red pixel (label = 5) is placed on the labeled layer,
+with displacement equal to the displacement of the original image. 
+then, the labeled mask is updated, it finds the closest background pixel to the 
+left of this red pixel, and the closest background pixel to the right of this
+red pixel; then a line is drawn on the labeled mask between those two background pixels,
+also in the color red.
+
+(2)
+<to be determined>
+
+(3)
+<to be determined>
+
+"""
+
+
+
+
+
 
 ################################################################################
 # %% libraries
 
 import os
 import shutil
+import glob
 
 import numpy as np
 import napari
+from magicgui import magicgui
 
 import functions_files.filelisting as ffl
     # import importlib; importlib.reload(ffl)
 import custom_functions.custom_mask_action as cfca
     # import importlib; importlib.reload(cfca)
+import functions_pipeline.utils as plutils
+    # import importlib; importlib.reload(plutils)
 
 import skimage.io as skio
 
@@ -48,6 +77,14 @@ def _backup_if_needed(filepath):
 
 ################################################################################
 # %% edit a single segfile
+
+def correct_mask_rootshootline():
+    """
+    Update mask according to manual correction lines.
+    
+    Given a plant mask with additional drawn lines, that demarcate the boundary
+    between root and shoot, the 
+    """
 
 def edit_segfile_single(curr_file, dir_imagefiles=None):
     """
@@ -74,15 +111,25 @@ def edit_segfile_single(curr_file, dir_imagefiles=None):
     img_original = None
     if not dir_imagefiles is None:
         # Generate the image path (assuming naming convention adhered)
-        imagefile_path = os.path.join(
+        imagefile_path_noext = os.path.join(
             dir_imagefiles, curr_file.subdir, 
-            curr_file.filename.replace('_seg.npz', '.tif').replace('_seg.npy', '.tif')
+            curr_file.filename.replace('_seg.npz', '').replace('_seg.npy', '')
         )
-        # Check if the image file exists, and then load
-        if os.path.exists(imagefile_path):
-            img_original = skio.imread(imagefile_path)
-            # !! ADDITIONAL EDIT SHOULD BE INSERTED HERE !! XXXX
-            # in addition, get np.load(segfile_path)['prepr_info']
+        # Look for file with any extension
+        file_hits = glob.glob(imagefile_path_noext+".*")
+        # If unique hit found, load
+        if len(file_hits) == 1:
+            img_original = skio.imread(file_hits[0])
+            # Check if crop info is available, if so, load   
+            print("Checking for cropping info..")
+            if 'prepr_info' in np.load(segfile_path):
+                crop_rect = np.load(segfile_path)['prepr_info']
+                minr, maxr, minc, maxc = crop_rect
+                img_original = img_original[minr:maxr, minc:maxc]
+                # plt.imshow(img_original)
+                print("Found")
+            else:
+                print("No cropping info found..")
     
     # State flags (use list to allow mutation inside nested functions)
     quit_requested = [False]
@@ -90,16 +137,33 @@ def edit_segfile_single(curr_file, dir_imagefiles=None):
     
     # Disable IPython event loop integration so that napari.run() blocks
     # (otherwise it returns immediately in VS Code interactive windows)
-    napari.settings.get_settings().application.ipy_interactive = False
+    try:
+        napari.settings.get_settings().application.ipy_interactive = False
+    except Exception as e:
+        print(f"  Warning: Could not disable IPython event loop integration: {e}")
     
     # Open napari viewer
     viewer = napari.Viewer(title=f"Editing: {curr_file.filename}")
     # Add original image if available
+    img_layer = None
     if not img_original is None:
-        viewer.add_image(img_original, name='original image')
+        img_layer = viewer.add_image(img_original, name='original image')
     # Add labels 
-    labels_layer = viewer.add_labels(img_mask, name='segmentation')
-    
+    labels_layer = viewer.add_labels(img_mask, name='segmentation',
+                                     colormap=plutils.custom_colors_plantclasses)
+
+    # ----- widget: shift image layer visually ---------------------------------
+    @magicgui(
+        shift_x={"widget_type": "Slider", "min": -200, "max": 200, "value": 0},
+        shift_y={"widget_type": "Slider", "min": -200, "max": 200, "value": 0},
+        auto_call=True,
+    )
+    def shift_widget(shift_x: int = 0, shift_y: int = 0):
+        if img_layer is not None:
+            img_layer.translate = (shift_y, shift_x)
+
+    viewer.window.add_dock_widget(shift_widget, name="Shift Image")
+
     # ----- keybinding: q = quit without saving --------------------------------
     @viewer.bind_key('q')
     def _quit_without_saving(viewer):
@@ -165,7 +229,7 @@ def edit_all_segfiles(df_filelist, dir_inputfiles, dir_imagefiles=None):
     """
     
     for file_idx in range(len(df_filelist)):
-        # file_idx = 0
+        # file_idx = 200
         
         # Get file info
         basedir, subdir, filename = \

@@ -39,14 +39,11 @@ pledit.edit_all_segfiles(df_filelist=df_filelist,
                          dir_inputfiles=DIR_INPUTFILES,
                          dir_imagefiles=DIR_IMAGEFILES)
 
-!! THINGS TO DO STILL HERE
-    THIS WORKS BUT THE FUNCTION TO MODIFY THE PLANT SHOULD BE WRITTEN
-    AND THE ORIGINAL IMAGE SHOULD BE PROJECTED CORRECTLY USING THE 
-    AUTO-SELECTED BBOX (SHOULD BE SAVED IN SEGFILE)
-
-SEE:
-functions_pipeline/edit_segfiles.py
---> "# !! ADDITIONAL EDIT SHOULD BE INSERTED HERE !! XXXX"
+# DEBUGGING REMOVE
+# import numpy as np
+# mytest = np.load('/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/202602/SEG/segfiles/20250611/20250611_OY_16_seg.npz')
+# mytest['prepr_info']
+# mytest.keys()
 
 ################################################################################
 # %% Run the analysis

@@ -12,6 +12,8 @@ custom_colors_plantclasses = \
         # 3 = seed brown
         '#A52A2A', 
         # 4 = leaf darkgreen
-        '#006400' 
+        '#006400',
+        # 5 = bright red (for corrections)
+        '#FF0000',
         ]
 cmap_plantclasses = ListedColormap(custom_colors_plantclasses)
