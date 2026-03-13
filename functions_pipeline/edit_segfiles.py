@@ -277,69 +277,70 @@ def correct_mask_throughline(mask, row, col):
 ################################################################################
 # %% relabel regions based on root/shoot lines
 
-def _relabel_around_line(mask, line_mask):
-    """
-    Relabel plant regions touching a single red line as shoot (1) or root (2).
+# REMOVE THIS PART
+# def _relabel_around_line(mask, line_mask):
+#     """
+#     Relabel plant regions touching a single red line as shoot (1) or root (2).
 
-    Identifies connected foreground components (labels 1 and 2) that are
-    adjacent to the given red line. Computes an overall center of mass (CoM)
-    of all touching pixels, and a per-region CoM. Regions whose CoM is above
-    (lower row) the overall CoM are assigned label 1 (shoot); regions below
-    (higher row) are assigned label 2 (root).
+#     Identifies connected foreground components (labels 1 and 2) that are
+#     adjacent to the given red line. Computes an overall center of mass (CoM)
+#     of all touching pixels, and a per-region CoM. Regions whose CoM is above
+#     (lower row) the overall CoM are assigned label 1 (shoot); regions below
+#     (higher row) are assigned label 2 (root).
 
-    Parameters
-    ----------
-    mask : np.ndarray
-        2D labeled mask array (modified in-place).
-    line_mask : np.ndarray
-        Boolean mask of one red-line connected component.
+#     Parameters
+#     ----------
+#     mask : np.ndarray
+#         2D labeled mask array (modified in-place).
+#     line_mask : np.ndarray
+#         Boolean mask of one red-line connected component.
 
-    Returns
-    -------
-    mask : np.ndarray
-        The modified mask.
-    """
-    # Binary foreground: only labels 1 and 2 (NOT 5 / red lines)
-    fg = (mask == 1) | (mask == 2)
-        # plt.imshow(fg)
-    # Label connected components of the foreground
-    cc_labels, n_components = sk_label(fg, return_num=True, connectivity=1)
+#     Returns
+#     -------
+#     mask : np.ndarray
+#         The modified mask.
+#     """
+#     # Binary foreground: only labels 1 and 2 (NOT 5 / red lines)
+#     fg = (mask == 1) | (mask == 2)
+#         # plt.imshow(fg)
+#     # Label connected components of the foreground
+#     cc_labels, n_components = sk_label(fg, return_num=True, connectivity=1)
 
-    # Dilate the line mask by 1 pixel to find adjacent components
-    line_dilated = binary_dilation(line_mask, iterations=1)
+#     # Dilate the line mask by 1 pixel to find adjacent components
+#     line_dilated = binary_dilation(line_mask, iterations=1)
 
-    # Find which component IDs touch the dilated line
-    touching_ids = set(np.unique(cc_labels[line_dilated])) - {0}
+#     # Find which component IDs touch the dilated line
+#     touching_ids = set(np.unique(cc_labels[line_dilated])) - {0}
 
-    if len(touching_ids) == 0:
-        print("    No plant regions touch this line — skipping.")
-        return mask
+#     if len(touching_ids) == 0:
+#         print("    No plant regions touch this line — skipping.")
+#         return mask
 
-    # Build a mask of all touching pixels
-    touching_mask = np.isin(cc_labels, list(touching_ids))
+#     # Build a mask of all touching pixels
+#     touching_mask = np.isin(cc_labels, list(touching_ids))
 
-    # Overall CoM (row coordinate) of all touching pixels
-    touching_rows = np.where(touching_mask)[0]
-    overall_com_row = touching_rows.mean()
+#     # Overall CoM (row coordinate) of all touching pixels
+#     touching_rows = np.where(touching_mask)[0]
+#     overall_com_row = touching_rows.mean()
 
-    # Per-region: compute CoM and assign shoot (1) or root (2)
-    for comp_id in touching_ids:
-        comp_mask = (cc_labels == comp_id)
-        comp_rows = np.where(comp_mask)[0]
-        comp_com_row = comp_rows.mean()
+#     # Per-region: compute CoM and assign shoot (1) or root (2)
+#     for comp_id in touching_ids:
+#         comp_mask = (cc_labels == comp_id)
+#         comp_rows = np.where(comp_mask)[0]
+#         comp_com_row = comp_rows.mean()
 
-        if comp_com_row < overall_com_row:
-            # Above overall CoM → shoot
-            mask[comp_mask] = 1
-        elif comp_com_row > overall_com_row:
-            # Below overall CoM → root
-            mask[comp_mask] = 2
-        # If equal, leave unchanged
+#         if comp_com_row < overall_com_row:
+#             # Above overall CoM → shoot
+#             mask[comp_mask] = 1
+#         elif comp_com_row > overall_com_row:
+#             # Below overall CoM → root
+#             mask[comp_mask] = 2
+#         # If equal, leave unchanged
 
-    # Convert the red line itself to root label (2)
-    mask[line_mask] = 2
+#     # Convert the red line itself to root label (2)
+#     mask[line_mask] = 2
 
-    return mask
+#     return mask
 
 
 def relabel_by_rootshootlines(mask):
@@ -406,8 +407,12 @@ def relabel_by_rootshootlines(mask):
                 mask[sub_mask] = 2
             # If equal, leave unchanged
 
-        # Step 3.4: convert red pixels in this blob to root (2)
-        mask[blob_mask & red_mask] = 2
+        # Step 3.4: convert red pixels to root (2) or shoot (1)
+        # Red pixels touching any root pixel → root, otherwise → shoot
+        root_dilated = binary_dilation(mask == 2, iterations=1)
+        blob_red = blob_mask & red_mask
+        mask[blob_red & root_dilated] = 2
+        mask[blob_red & ~root_dilated] = 1
 
     if blobs_processed == 0:
         print("  No red lines found in any blob — nothing to relabel.")
@@ -440,7 +445,11 @@ def edit_segfile_single(curr_file, dir_imagefiles=None):
     
     # Load labeled mask from the .npz file
     segfile_path = curr_file.fullpath
-    img_mask = np.load(segfile_path)['img_pred_lbls']
+    segfile_data = np.load(segfile_path)
+    img_mask = segfile_data['img_pred_lbls']
+    # Preserve any extra arrays (e.g. prepr_info) for re-saving later
+    extra_arrays = {k: segfile_data[k] for k in segfile_data.files
+                    if k != 'img_pred_lbls'}
     
     # Optionally, load the matching image file based on dir_imagefiles
     img_original = None
@@ -457,8 +466,8 @@ def edit_segfile_single(curr_file, dir_imagefiles=None):
             img_original = skio.imread(file_hits[0])
             # Check if crop info is available, if so, load   
             print("Checking for cropping info..")
-            if 'prepr_info' in np.load(segfile_path):
-                crop_rect = np.load(segfile_path)['prepr_info']
+            if 'prepr_info' in extra_arrays:
+                crop_rect = extra_arrays['prepr_info']
                 minr, maxr, minc, maxc = crop_rect
                 img_original = img_original[minr:maxr, minc:maxc]
                 # plt.imshow(img_original)
@@ -571,7 +580,8 @@ def edit_segfile_single(curr_file, dir_imagefiles=None):
         
         # Save the (possibly edited) mask back to the .npz file
         edited_mask = labels_layer.data
-        np.savez_compressed(segfile_path, img_pred_lbls=edited_mask)
+        np.savez_compressed(segfile_path, img_pred_lbls=edited_mask,
+                            **extra_arrays)
         print(f"  Saved: {segfile_path}")
     else:
         print(f"  Not saved: {segfile_path}")

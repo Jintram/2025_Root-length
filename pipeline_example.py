@@ -50,7 +50,7 @@ pledit.edit_all_segfiles(df_filelist=df_filelist,
 
 ################################################################################
 # %% Run the analysis
-plap.analyze_all_plates(df_filelist=df_filelist, 
+plap.analyze_all_plates(df_filelist=df_filelist,
                         output_dir=DIR_OUTPUTFILES)
 
 # Now make one big overview dataframe
@@ -65,3 +65,10 @@ plap.generate_df_all(df_filelist, DIR_OUTPUTFILES)
 # find plant with id 250502_OY_09
 matching_idx = df_filelist.index[df_filelist["filename"].str.contains("250502_OY_09", na=False)]
 print(matching_idx.tolist())
+
+
+
+# checking out a sample, and why it doesn't have a rect?
+import numpy as np
+filepath = "/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/202602/SEG/segfiles/20250611/20250617_OY_15_seg.npz"
+test2=np.load(filepath)
