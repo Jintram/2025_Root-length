@@ -76,15 +76,67 @@ def _backup_if_needed(filepath):
 
 
 ################################################################################
-# %% edit a single segfile
+# %% correct mask root/shoot line
 
-def correct_mask_rootshootline():
+def correct_mask_rootshootline(mask, row, col):
     """
-    Update mask according to manual correction lines.
-    
-    Given a plant mask with additional drawn lines, that demarcate the boundary
-    between root and shoot, the 
+    Draw a horizontal root/shoot boundary line (label=5) on the mask.
+
+    Places a seed pixel at (row, col) with label 5, then scans left and right
+    along the same row to find the nearest background pixels (value == 0).
+    A horizontal line of label 5 is drawn between those two background pixels.
+
+    Parameters
+    ----------
+    mask : np.ndarray
+        2D labeled mask array (modified in-place).
+    row : int
+        Row position on the mask.
+    col : int
+        Column position on the mask.
+
+    Returns
+    -------
+    mask : np.ndarray
+        The modified mask.
     """
+    n_rows, n_cols = mask.shape
+
+    # Bounds check
+    if row < 0 or row >= n_rows or col < 0 or col >= n_cols:
+        print("  Position out of bounds — skipping.")
+        return mask
+
+    # Place seed pixel
+    mask[row, col] = 5
+
+    # Scan left for nearest background pixel (value == 0)
+    left_col = col
+    for c in range(col - 1, -1, -1):
+        if mask[row, c] == 0:
+            left_col = c
+            break
+    else:
+        left_col = 0  # reached edge without finding background
+
+    # Scan right for nearest background pixel (value == 0)
+    right_col = col
+    for c in range(col + 1, n_cols):
+        if mask[row, c] == 0:
+            right_col = c
+            break
+    else:
+        right_col = n_cols - 1  # reached edge without finding background
+
+    # Draw horizontal line between the two background pixels
+    mask[row, left_col:right_col + 1] = 5
+    print(f"  Drew line at row {row} from col {left_col} to {right_col}")
+
+    return mask
+
+
+################################################################################
+# %% edit a single segfile
 
 def edit_segfile_single(curr_file, dir_imagefiles=None):
     """
@@ -173,24 +225,27 @@ def edit_segfile_single(curr_file, dir_imagefiles=None):
         save_on_close[0] = False
         viewer.close()
     
-    # ----- keybinding: r = custom action --------------------------------------
+    # ----- keybinding: r = draw root/shoot boundary line -----------------------
     @viewer.bind_key('r')
     def _run_custom_action(viewer):
-        """Call the custom placeholder function at the mouse position."""
-        # Get the current mouse position in data coordinates
-        # (napari stores this as the last cursor position on the canvas)
+        """Draw a horizontal red line (label=5) at the root/shoot boundary."""
+        # Get the current mouse position in world coordinates
         mouse_pos = viewer.cursor.position
-        # Convert to integer row, col
-        row = int(round(mouse_pos[-2]))
-        col = int(round(mouse_pos[-1]))
-        print(f"  'r' pressed at position ({row}, {col})")
-        
-        # Call the custom action; it may modify the mask
-        current_data = labels_layer.data
-        modified_data = cfca.custom_mask_action(current_data, (row, col))
-        
-        # Update the labels layer with the (potentially modified) mask
-        labels_layer.data = modified_data
+        mouse_row = int(round(mouse_pos[-2]))
+        mouse_col = int(round(mouse_pos[-1]))
+        print(f"  'r' pressed at world position ({mouse_row}, {mouse_col})")
+
+        # Subtract the image shift to get the correct label-layer position
+        row = mouse_row - shift_widget.shift_y.value
+        col = mouse_col - shift_widget.shift_x.value
+        print(f"  Mapped to label position ({row}, {col})")
+
+        # Call the standalone function
+        mask = labels_layer.data
+        mask = correct_mask_rootshootline(mask, row, col)
+
+        # Refresh the labels layer
+        labels_layer.data = mask
     
     # Run napari (blocks until the viewer is closed)
     napari.run()
