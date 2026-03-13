@@ -55,6 +55,15 @@ import functions_pipeline.utils as plutils
     # import importlib; importlib.reload(plutils)
 
 import skimage.io as skio
+from skimage.draw import line
+
+################################################################################
+# %% precomputed distance grid for nearest-background search
+
+_SEARCH_RADIUS = 200
+_yy, _xx = np.mgrid[-_SEARCH_RADIUS:_SEARCH_RADIUS + 1,
+                    -_SEARCH_RADIUS:_SEARCH_RADIUS + 1]
+_DIST_GRID = np.sqrt(_yy**2 + _xx**2).astype(np.float32)
 
 ################################################################################
 # %% helper: backup
@@ -80,11 +89,12 @@ def _backup_if_needed(filepath):
 
 def correct_mask_rootshootline(mask, row, col):
     """
-    Draw a horizontal root/shoot boundary line (label=5) on the mask.
+    Draw a root/shoot boundary line (label=5) on the mask.
 
-    Places a seed pixel at (row, col) with label 5, then scans left and right
-    along the same row to find the nearest background pixels (value == 0).
-    A horizontal line of label 5 is drawn between those two background pixels.
+    Places a seed pixel at (row, col) with label 5, then finds the nearest
+    background pixel (value == 0) to the left and right of the seed using
+    a precomputed Euclidean distance grid. A line is drawn between those
+    two background pixels using skimage.draw.line.
 
     Parameters
     ----------
@@ -101,36 +111,161 @@ def correct_mask_rootshootline(mask, row, col):
         The modified mask.
     """
     n_rows, n_cols = mask.shape
+    R = _SEARCH_RADIUS
 
     # Bounds check
     if row < 0 or row >= n_rows or col < 0 or col >= n_cols:
         print("  Position out of bounds — skipping.")
         return mask
 
-    # Place seed pixel
-    mask[row, col] = 5
+    # Determine crop region (clamped to image bounds)
+    row_min = max(0, row - R)
+    row_max = min(n_rows, row + R + 1)
+    col_min = max(0, col - R)
+    col_max = min(n_cols, col + R + 1)
 
-    # Scan left for nearest background pixel (value == 0)
-    left_col = col
-    for c in range(col - 1, -1, -1):
-        if mask[row, c] == 0:
-            left_col = c
-            break
+    # Corresponding slice in the precomputed distance grid
+    grid_row_min = R - (row - row_min)
+    grid_row_max = R + (row_max - row)
+    grid_col_min = R - (col - col_min)
+    grid_col_max = R + (col_max - col)
+
+    # Extract local region and matching distance grid
+    region = mask[row_min:row_max, col_min:col_max]
+    distances = _DIST_GRID[grid_row_min:grid_row_max,
+                           grid_col_min:grid_col_max].copy()
+
+    # Mask out foreground pixels (only labels 1, 2, and 5 are foreground)
+    foreground = (region == 1) | (region == 2) | (region == 5)
+    distances[foreground] = np.inf
+
+    # Local seed position within the cropped region
+    local_row = row - row_min
+    local_col = col - col_min
+
+    # --- Find nearest background pixel to the LEFT (col < local_col) ---
+    left_distances = distances.copy()
+    left_distances[:, local_col:] = np.inf   # exclude seed column and right
+    if np.any(np.isfinite(left_distances)):
+        left_idx = np.unravel_index(np.argmin(left_distances),
+                                    left_distances.shape)
+        left_point = (left_idx[0] + row_min, left_idx[1] + col_min)
     else:
-        left_col = 0  # reached edge without finding background
+        print("  No background found to the left — skipping.")
+        return mask
 
-    # Scan right for nearest background pixel (value == 0)
-    right_col = col
-    for c in range(col + 1, n_cols):
-        if mask[row, c] == 0:
-            right_col = c
-            break
+    # --- Find nearest background pixel to the RIGHT (col > local_col) ---
+    right_distances = distances.copy()
+    right_distances[:, :local_col + 1] = np.inf  # exclude seed column and left
+    if np.any(np.isfinite(right_distances)):
+        right_idx = np.unravel_index(np.argmin(right_distances),
+                                     right_distances.shape)
+        right_point = (right_idx[0] + row_min, right_idx[1] + col_min)
     else:
-        right_col = n_cols - 1  # reached edge without finding background
+        print("  No background found to the right — skipping.")
+        return mask
 
-    # Draw horizontal line between the two background pixels
-    mask[row, left_col:right_col + 1] = 5
-    print(f"  Drew line at row {row} from col {left_col} to {right_col}")
+    # Draw line between the two background pixels (label=5)
+    rr, cc = line(left_point[0], left_point[1],
+                  right_point[0], right_point[1])
+    mask[rr, cc] = 5
+    print(f"  Drew line from {left_point} to {right_point}")
+
+    return mask
+
+
+def correct_mask_throughline(mask, row, col):
+    """
+    Draw a boundary line (label=5) through the seed point on the mask.
+
+    Finds the nearest background pixel (bg1) to the seed (row, col), then
+    walks from the seed in the direction away from bg1 (i.e. bg1 → seed,
+    continued) until a second background pixel (bg2) is found. A line is
+    drawn from bg1 to bg2.
+
+    If the seed is on background, the call is skipped.
+
+    Parameters
+    ----------
+    mask : np.ndarray
+        2D labeled mask array (modified in-place).
+    row : int
+        Row position on the mask.
+    col : int
+        Column position on the mask.
+
+    Returns
+    -------
+    mask : np.ndarray
+        The modified mask.
+    """
+    n_rows, n_cols = mask.shape
+    R = _SEARCH_RADIUS
+
+    # Bounds check
+    if row < 0 or row >= n_rows or col < 0 or col >= n_cols:
+        print("  Position out of bounds — skipping.")
+        return mask
+
+    # Skip if the seed is already on background
+    if mask[row, col] == 0:
+        print("  Seed is on background — skipping.")
+        return mask
+
+    # --- Find bg1: nearest background pixel to the seed ---
+    row_min = max(0, row - R)
+    row_max = min(n_rows, row + R + 1)
+    col_min = max(0, col - R)
+    col_max = min(n_cols, col + R + 1)
+
+    grid_row_min = R - (row - row_min)
+    grid_row_max = R + (row_max - row)
+    grid_col_min = R - (col - col_min)
+    grid_col_max = R + (col_max - col)
+
+    region = mask[row_min:row_max, col_min:col_max]
+    distances = _DIST_GRID[grid_row_min:grid_row_max,
+                           grid_col_min:grid_col_max].copy()
+    foreground = (region == 1) | (region == 2) | (region == 5)
+    distances[foreground] = np.inf
+
+    if not np.any(np.isfinite(distances)):
+        print("  No background found nearby — skipping.")
+        return mask
+
+    bg1_local = np.unravel_index(np.argmin(distances), distances.shape)
+    bg1 = (bg1_local[0] + row_min, bg1_local[1] + col_min)
+
+    # --- Compute direction from bg1 through seed ---
+    dy = row - bg1[0]
+    dx = col - bg1[1]
+    length = np.sqrt(dy**2 + dx**2)
+    if length == 0:
+        print("  Seed coincides with bg1 — skipping.")
+        return mask
+    dy_unit = dy / length
+    dx_unit = dx / length
+
+    # --- Walk from seed in direction bg1→seed to find bg2 ---
+    max_steps = 2 * R
+    bg2 = None
+    for step in range(1, max_steps + 1):
+        r = int(round(row + dy_unit * step))
+        c = int(round(col + dx_unit * step))
+        if r < 0 or r >= n_rows or c < 0 or c >= n_cols:
+            break
+        if mask[r, c] not in (1, 2, 5):
+            bg2 = (r, c)
+            break
+
+    if bg2 is None:
+        print("  No second background pixel found — skipping.")
+        return mask
+
+    # Draw line from bg1 to bg2 (label=5)
+    rr, cc = line(bg1[0], bg1[1], bg2[0], bg2[1])
+    mask[rr, cc] = 5
+    print(f"  Drew through-line from {bg1} to {bg2}")
 
     return mask
 
@@ -243,6 +378,28 @@ def edit_segfile_single(curr_file, dir_imagefiles=None):
         # Call the standalone function
         mask = labels_layer.data
         mask = correct_mask_rootshootline(mask, row, col)
+
+        # Refresh the labels layer
+        labels_layer.data = mask
+    
+    # ----- keybinding: t = draw through-line ----------------------------------
+    @viewer.bind_key('t')
+    def _run_throughline_action(viewer):
+        """Draw a line (label=5) through the seed from bg1 to bg2."""
+        # Get the current mouse position in world coordinates
+        mouse_pos = viewer.cursor.position
+        mouse_row = int(round(mouse_pos[-2]))
+        mouse_col = int(round(mouse_pos[-1]))
+        print(f"  't' pressed at world position ({mouse_row}, {mouse_col})")
+
+        # Subtract the image shift to get the correct label-layer position
+        row = mouse_row - shift_widget.shift_y.value
+        col = mouse_col - shift_widget.shift_x.value
+        print(f"  Mapped to label position ({row}, {col})")
+
+        # Call the standalone function
+        mask = labels_layer.data
+        mask = correct_mask_throughline(mask, row, col)
 
         # Refresh the labels layer
         labels_layer.data = mask

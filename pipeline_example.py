@@ -35,6 +35,9 @@ df_filelist, metadata_toseg_filepath = \
 
 DIR_IMAGEFILES = '/Users/m.wehrens/Data_notbacked/2025_hypocotyl_images/DATA/'
 
+# for debugging:
+# import importlib; importlib.reload(pledit)
+
 pledit.edit_all_segfiles(df_filelist=df_filelist,
                          dir_inputfiles=DIR_INPUTFILES,
                          dir_imagefiles=DIR_IMAGEFILES)
