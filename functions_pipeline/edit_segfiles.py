@@ -344,11 +344,15 @@ def _relabel_around_line(mask, line_mask):
 
 def relabel_by_rootshootlines(mask):
     """
-    Relabel all plant regions based on red boundary lines (label=5).
+    Relabel plant regions based on red boundary lines (label=5).
 
-    Finds all connected components of label 5 (red lines), and for each line
-    calls _relabel_around_line to assign adjacent plant regions as shoot (1)
-    or root (2) based on their center of mass relative to the touching pixels.
+    Finds plant blobs by treating labels 1, 2, and 5 as foreground. For each
+    blob that contains red pixels (label=5):
+      1. Compute overall center of mass (row) of the blob.
+      2. Remove red pixels to split the blob into sub-regions.
+      3. For each sub-region, assign shoot (1) if its CoM is above the overall
+         CoM, or root (2) if below.
+      4. Convert all red pixels in the blob to root (2).
 
     Parameters
     ----------
@@ -360,22 +364,57 @@ def relabel_by_rootshootlines(mask):
     mask : np.ndarray
         The modified mask.
     """
-    # Find connected components of red lines (label=5)
-    red_binary = (mask == 5)
-    red_cc, n_lines = sk_label(red_binary, return_num=True)
+    # Step 1: find plant blobs including red lines
+    fg_all = (mask == 1) | (mask == 2) | (mask == 5)
+    blob_labels, n_blobs = sk_label(fg_all, return_num=True, connectivity=1)
 
-    if n_lines == 0:
-        print("  No red lines found — nothing to relabel.")
+    if n_blobs == 0:
+        print("  No plant blobs found — nothing to relabel.")
         return mask
 
-    print(f"  Found {n_lines} red line(s). Processing...")
+    red_mask = (mask == 5)
+    blobs_processed = 0
 
-    for line_id in range(1, n_lines + 1):
-        line_mask = (red_cc == line_id)
-        print(f"    Processing line {line_id}/{n_lines}")
-        mask = _relabel_around_line(mask, line_mask)
+    for blob_id in range(1, n_blobs + 1):
+        blob_mask = (blob_labels == blob_id)
 
+        # Step 2: skip blobs without red pixels
+        if not np.any(red_mask & blob_mask):
+            continue
+
+        blobs_processed += 1
+
+        # Step 3.1: overall CoM of the entire blob
+        blob_rows = np.where(blob_mask)[0]
+        overall_com_row = blob_rows.mean()
+
+        # Step 3.2: remove red lines within this blob to split into sub-regions
+        fg_no_red = blob_mask & ~red_mask
+        sub_labels, n_subs = sk_label(fg_no_red, return_num=True, connectivity=1)
+
+        # Step 3.3: assign shoot/root per sub-region
+        for sub_id in range(1, n_subs + 1):
+            sub_mask = (sub_labels == sub_id)
+            sub_rows = np.where(sub_mask)[0]
+            sub_com_row = sub_rows.mean()
+
+            if sub_com_row < overall_com_row:
+                # Above overall CoM → shoot
+                mask[sub_mask] = 1
+            elif sub_com_row > overall_com_row:
+                # Below overall CoM → root
+                mask[sub_mask] = 2
+            # If equal, leave unchanged
+
+        # Step 3.4: convert red pixels in this blob to root (2)
+        mask[blob_mask & red_mask] = 2
+
+    if blobs_processed == 0:
+        print("  No red lines found in any blob — nothing to relabel.")
+    else:
+        print(f"  Processed {blobs_processed} blob(s) with red lines.")
     print("  Relabeling complete.")
+
     return mask
 
 
