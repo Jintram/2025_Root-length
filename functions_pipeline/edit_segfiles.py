@@ -401,56 +401,16 @@ def relabel_by_rootshootlines(mask):
 
 
 ################################################################################
-# %% edit a single segfile
+# %% open napari for annotation editing
 
-def edit_segfile_single(curr_file, dir_imagefiles=None):
-    """
-    Open a single segmentation file in napari for interactive editing.
-    
-    The user can edit the labeled mask using default napari tools.
-    Keybindings:
-        q - close without saving, signal to quit the loop
-        r - call custom_mask_action at the current mouse position
-    
-    Input parameters:
-    - curr_file: a fileinfo object (from functions_files.filelisting) pointing
-      to the .npz segmentation file.
-    
-    Returns:
-    - quit_requested: bool, True if the user pressed "q" to quit.
-    """
-    
-    # Load labeled mask from the .npz file
-    segfile_path = curr_file.fullpath
-    segfile_data = np.load(segfile_path)
-    img_mask = segfile_data['img_pred_lbls']
-    # Preserve any extra arrays (e.g. prepr_info) for re-saving later
-    extra_arrays = {k: segfile_data[k] for k in segfile_data.files
-                    if k != 'img_pred_lbls'}
-    
-    # Optionally, load the matching image file based on dir_imagefiles
-    img_original = None
-    if not dir_imagefiles is None:
-        # Generate the image path (assuming naming convention adhered)
-        imagefile_path_noext = os.path.join(
-            dir_imagefiles, curr_file.subdir, 
-            curr_file.filename.replace('_seg.npz', '').replace('_seg.npy', '')
-        )
-        # Look for file with any extension
-        file_hits = glob.glob(imagefile_path_noext+".*")
-        # If unique hit found, load
-        if len(file_hits) == 1:
-            img_original = skio.imread(file_hits[0])
-            # Check if crop info is available, if so, load   
-            print("Checking for cropping info..")
-            if 'prepr_info' in extra_arrays:
-                crop_rect = extra_arrays['prepr_info']
-                minr, maxr, minc, maxc = crop_rect
-                img_original = img_original[minr:maxr, minc:maxc]
-                # plt.imshow(img_original)
-                print("Found")
-            else:
-                print("No cropping info found..")
+def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
+                           title="Editing segmentation"):
+    '''
+    Opens napari with `image` as background and `segmentation` as an editable label
+    layer, optionally styled with `mylabelcolormap`. Returns `(seg_data, quitloop_flag)`,
+    where `seg_data` is the edited annotation (or None if quit) and `quitloop_flag`
+    is True if the user pressed 'q'.
+    '''
     
     # State flags (use list to allow mutation inside nested functions)
     quit_requested = [False]
@@ -464,14 +424,16 @@ def edit_segfile_single(curr_file, dir_imagefiles=None):
         print(f"  Warning: Could not disable IPython event loop integration: {e}")
     
     # Open napari viewer
-    viewer = napari.Viewer(title=f"Editing: {curr_file.filename}")
+    viewer = napari.Viewer(title=title)
     # Add original image if available
     img_layer = None
-    if not img_original is None:
-        img_layer = viewer.add_image(img_original, name='original image')
-    # Add labels 
-    labels_layer = viewer.add_labels(img_mask, name='segmentation',
-                                     colormap=plutils.custom_colors_plantclasses)
+    if image is not None:
+        img_layer = viewer.add_image(image, name='original image')
+    # Add labels
+    labels_kwargs = dict(name='segmentation')
+    if mylabelcolormap is not None:
+        labels_kwargs['colormap'] = mylabelcolormap
+    labels_layer = viewer.add_labels(segmentation, **labels_kwargs)
 
     # ----- widget: shift image layer visually ---------------------------------
     @magicgui(
@@ -552,18 +514,84 @@ def edit_segfile_single(curr_file, dir_imagefiles=None):
     
     # ----- after viewer is closed ---------------------------------------------
     if save_on_close[0]:
+        return labels_layer.data, quit_requested[0]
+    else:
+        return None, quit_requested[0]
+
+
+################################################################################
+# %% edit a single segfile
+
+def edit_segfile_single(curr_file, dir_imagefiles=None):
+    """
+    Open a single segmentation file in napari for interactive editing.
+    
+    The user can edit the labeled mask using default napari tools.
+    Keybindings:
+        q - close without saving, signal to quit the loop
+        r - call custom_mask_action at the current mouse position
+    
+    Input parameters:
+    - curr_file: a fileinfo object (from functions_files.filelisting) pointing
+      to the .npz segmentation file.
+    
+    Returns:
+    - quit_requested: bool, True if the user pressed "q" to quit.
+    """
+    
+    # Load labeled mask from the .npz file
+    segfile_path = curr_file.fullpath
+    segfile_data = np.load(segfile_path)
+    img_mask = segfile_data['img_pred_lbls']
+    # Preserve any extra arrays (e.g. prepr_info) for re-saving later
+    extra_arrays = {k: segfile_data[k] for k in segfile_data.files
+                    if k != 'img_pred_lbls'}
+    
+    # Optionally, load the matching image file based on dir_imagefiles
+    img_original = None
+    if not dir_imagefiles is None:
+        # Generate the image path (assuming naming convention adhered)
+        imagefile_path_noext = os.path.join(
+            dir_imagefiles, curr_file.subdir, 
+            curr_file.filename.replace('_seg.npz', '').replace('_seg.npy', '')
+        )
+        # Look for file with any extension
+        file_hits = glob.glob(imagefile_path_noext+".*")
+        # If unique hit found, load
+        if len(file_hits) == 1:
+            img_original = skio.imread(file_hits[0])
+            # Check if crop info is available, if so, load   
+            print("Checking for cropping info..")
+            if 'prepr_info' in extra_arrays:
+                crop_rect = extra_arrays['prepr_info']
+                minr, maxr, minc, maxc = crop_rect
+                img_original = img_original[minr:maxr, minc:maxc]
+                # plt.imshow(img_original)
+                print("Found")
+            else:
+                print("No cropping info found..")
+    
+    # Open napari for editing
+    seg_data, quit_requested = edit_annotation_napari(
+        image=img_original,
+        segmentation=img_mask,
+        mylabelcolormap=plutils.custom_colors_plantclasses,
+        title=f"Editing: {curr_file.filename}",
+    )
+    
+    # Save or skip based on napari result
+    if seg_data is not None:
         # Create backup before first save
         _backup_if_needed(segfile_path)
         
         # Save the (possibly edited) mask back to the .npz file
-        edited_mask = labels_layer.data
-        np.savez_compressed(segfile_path, img_pred_lbls=edited_mask,
+        np.savez_compressed(segfile_path, img_pred_lbls=seg_data,
                             **extra_arrays)
         print(f"  Saved: {segfile_path}")
     else:
         print(f"  Not saved: {segfile_path}")
     
-    return quit_requested[0]
+    return quit_requested
 
 
 ################################################################################
