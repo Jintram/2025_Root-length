@@ -40,8 +40,11 @@ def gen_metadatafile_segfiles(
     os.makedirs(directory_outputfiles, exist_ok=True)
     
     # find all image files
-    all_paths = glob.glob(os.path.join(directory_inputfiles, '**', f'*[{"|".join(file_formats)}]'))
-    
+    # all_paths = glob.glob(os.path.join(directory_inputfiles, '**', f'*[{"|".join(file_formats)}]'))
+    all_paths = []
+    for ext in file_formats:
+        all_paths.extend(glob.glob(os.path.join(directory_inputfiles,f'**/*{ext}'), recursive=True))
+        
     # Now get the subdirs and filenames
     all_subdirs = [
         os.path.relpath(os.path.dirname(current_path), directory_inputfiles)

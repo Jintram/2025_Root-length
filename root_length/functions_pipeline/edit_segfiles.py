@@ -404,13 +404,18 @@ def relabel_by_rootshootlines(mask):
 # %% open napari for annotation editing
 
 def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
-                           title="Editing segmentation"):
+                           title="Editing segmentation (for roots)"):
     '''
     Opens napari with `image` as background and `segmentation` as an editable label
     layer, optionally styled with `mylabelcolormap`. Returns `(seg_data, quitloop_flag)`,
     where `seg_data` is the edited annotation (or None if quit) and `quitloop_flag`
     is True if the user pressed 'q'.
     '''
+    
+    # Explain options to user
+    print("____\nStarting Napari editor window\n===\nq=quit without saving,"+
+          "\nr=draw root/shoot line, \nt=draw through-line, \nu=relabel by lines"+
+          "\n____")
     
     # State flags (use list to allow mutation inside nested functions)
     quit_requested = [False]

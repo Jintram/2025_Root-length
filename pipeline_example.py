@@ -18,6 +18,9 @@ import root_length.functions_pipeline.edit_segfiles as pledit
 DIR_INPUTFILES = '/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/202602/SEG/segfiles/'
 DIR_OUTPUTFILES = '/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/202602/LEN/'
 
+# DIR_INPUTFILES = '/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/SELECTION_ML/model_seg/segfiles/'
+# DIR_OUTPUTFILES = '/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/SELECTION_ML/model_seg/segfiles/test/'
+
 import root_length.functions_files.filelisting as gfl
     # import importlib; importlib.reload(gfl)
 
@@ -34,6 +37,8 @@ df_filelist, metadata_toseg_filepath = \
 # Uncomment below to review and correct segmentations before analysis.
 
 DIR_IMAGEFILES = '/Users/m.wehrens/Data_notbacked/2025_hypocotyl_images/DATA/'
+
+# DIR_IMAGEFILES = '/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/SELECTION_ML/Originals/' 
 
 # for debugging:
 # import importlib; importlib.reload(pledit)
