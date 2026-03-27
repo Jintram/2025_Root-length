@@ -6,11 +6,11 @@ import os
 
 import numpy as np
 from skimage import morphology
-import custom_functions.remove_large_objects as cflo
+import root_length.custom_functions.remove_large_objects as cflo
 from skimage.measure import label, regionprops
 
 from matplotlib import pyplot as plt
-import functions_pipeline.utils as plutils
+import root_length.functions_pipeline.utils as plutils
 
 # %matplotlib inline
 # %matplotlib qt

@@ -20,13 +20,13 @@ import pandas as pd
 from matplotlib import pyplot as plt
 
 # load custom scripts
-import functions_pipeline.utils as plutils
+import root_length.functions_pipeline.utils as plutils
     # import importlib; importlib.reload(plutils)
-import functions_pipeline.preprocessing as plprep
+import root_length.functions_pipeline.preprocessing as plprep
     # import importlib; importlib.reload(plprep)
-import functions_pipeline.determine_length as pllen
+import root_length.functions_pipeline.determine_length as pllen
     # import importlib; importlib.reload(pllen)
-import functions_files.filelisting as ffl
+import root_length.functions_files.filelisting as ffl
     # import importlib; importlib.reload(ffl)
     
 

@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
 
 # import color scheme
-import functions_pipeline.utils as plutils
+import root_length.functions_pipeline.utils as plutils
 
 ################################################################################
 #%% functions

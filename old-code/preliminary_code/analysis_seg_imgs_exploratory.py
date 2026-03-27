@@ -20,7 +20,7 @@ from scipy.ndimage import convolve, distance_transform_edt
 
 
 # custom libs
-import custom_functions.remove_large_objects as cflo
+import root_length.custom_functions.remove_large_objects as cflo
     # import importlib; importlib.reload(cflo)
 
 # generate a randomly shuffled rainbow categorical color map

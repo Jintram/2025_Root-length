@@ -4,11 +4,11 @@
 
 import os
 
-import functions_files.filelisting as ffl
+import root_length.functions_files.filelisting as ffl
     # import importlib; importlib.reload(ffl)
-import functions_pipeline.analyze_plate as plap
+import root_length.functions_pipeline.analyze_plate as plap
     # import importlib; importlib.reload(plap)
-import functions_pipeline.edit_segfiles as pledit
+import root_length.functions_pipeline.edit_segfiles as pledit
     # import importlib; importlib.reload(pledit)
 
 ################################################################################
@@ -18,7 +18,7 @@ import functions_pipeline.edit_segfiles as pledit
 DIR_INPUTFILES = '/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/202602/SEG/segfiles/'
 DIR_OUTPUTFILES = '/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/202602/LEN/'
 
-import functions_files.filelisting as gfl
+import root_length.functions_files.filelisting as gfl
     # import importlib; importlib.reload(gfl)
 
 # Generate list of files to analyze

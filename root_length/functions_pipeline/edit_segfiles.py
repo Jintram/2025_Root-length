@@ -24,11 +24,11 @@ import numpy as np
 import napari
 from magicgui import magicgui
 
-import functions_files.filelisting as ffl
+import root_length.functions_files.filelisting as ffl
     # import importlib; importlib.reload(ffl)
-import custom_functions.custom_mask_action as cfca
+import root_length.custom_functions.custom_mask_action as cfca
     # import importlib; importlib.reload(cfca)
-import functions_pipeline.utils as plutils
+import root_length.functions_pipeline.utils as plutils
     # import importlib; importlib.reload(plutils)
 
 import skimage.io as skio
@@ -532,7 +532,7 @@ def edit_segfile_single(curr_file, dir_imagefiles=None):
         r - call custom_mask_action at the current mouse position
     
     Input parameters:
-    - curr_file: a fileinfo object (from functions_files.filelisting) pointing
+    - curr_file: a fileinfo object (from root_length.functions_files.filelisting) pointing
       to the .npz segmentation file.
     
     Returns:
