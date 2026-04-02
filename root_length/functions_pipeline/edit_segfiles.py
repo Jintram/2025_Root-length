@@ -23,6 +23,7 @@ import glob
 import numpy as np
 import napari
 from magicgui import magicgui
+from magicgui.widgets import Container
 
 import root_length.functions_files.filelisting as ffl
     # import importlib; importlib.reload(ffl)
@@ -34,6 +35,7 @@ import root_length.functions_pipeline.utils as plutils
 import skimage.io as skio
 from skimage.draw import line
 from skimage.measure import label as sk_label
+from skimage.morphology import remove_small_objects
 from scipy.ndimage import binary_dilation
 
 ################################################################################
@@ -401,6 +403,24 @@ def relabel_by_rootshootlines(mask):
 
 
 ################################################################################
+# %% helper: remove small connected regions from labeled mask
+
+def remove_small_foregroundregions(mask, min_size):
+    """Remove small connected foreground regions while preserving original labels."""
+    cc = sk_label(mask > 0)
+    cc_filtered = remove_small_objects(cc, min_size=min_size)
+    return np.where(cc_filtered > 0, mask, 0)
+
+
+def remove_large_foregroundregions(mask, min_size):
+    """Remove large connected foreground regions while preserving original labels."""
+    cc = sk_label(mask > 0)
+    large_only = remove_small_objects(cc, min_size=min_size - 1)
+    keep = cc ^ large_only # keep what is not large
+    return np.where(keep, mask, 0)
+
+
+################################################################################
 # %% open napari for annotation editing
 
 def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
@@ -425,8 +445,23 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     # (otherwise it returns immediately in VS Code interactive windows)
     try:
         napari.settings.get_settings().application.ipy_interactive = False
+        print("Disabled ipy_interactive to ensure Napari blocks further execution until user action..")
     except Exception as e:
-        print(f"  Warning: Could not disable IPython event loop integration: {e}")
+        pass
+    
+    # Disable IPython GUI event loop (e.g. "%gui qt" in Spyder) so that
+    # napari.run() blocks instead of returning immediately.
+    # The previous setting is restored after napari.run() returns.
+    _prev_gui = None
+    try:
+        from IPython import get_ipython
+        ipython = get_ipython()
+        if ipython is not None:
+            _prev_gui = ipython.active_eventloop  # e.g. "qt5" or None
+            ipython.run_line_magic('gui', '')
+        print("Disabled '%gui "+_prev_gui+"' magic to ensure Napari blocks further execution until user action..")
+    except Exception:
+        pass
     
     # Open napari viewer
     viewer = napari.Viewer(title=title)
@@ -449,8 +484,38 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     def shift_widget(shift_x: int = 0, shift_y: int = 0):
         if img_layer is not None:
             img_layer.translate = (shift_y, shift_x)
-
-    viewer.window.add_dock_widget(shift_widget, name="Shift Image")
+    
+    # (added to viewer below, using container)
+    
+    # ----- widget: remove small labeled regions --------------------------------
+    @magicgui(
+        min_size={"widget_type": "SpinBox", "min": 1, "max": 100000, "value": 100,
+                  "label": "Min area (px)"},
+        call_button="Remove smaller",
+    )
+    def remove_small_widget(min_size: int = 100):
+        mask = labels_layer.data
+        labels_layer.data = remove_small_foregroundregions(mask, min_size=min_size)
+        print(f"  Removed regions smaller than {min_size} px.")
+    
+    # (added to viewer below, using container)
+    
+    # ----- widget: remove large labeled regions --------------------------------
+    @magicgui(
+        min_size={"widget_type": "SpinBox", "min": 1, "max": 1000000, "value": 10000,
+                  "label": "Max area (px)"},
+        call_button="Remove larger",
+    )
+    def remove_large_widget(min_size: int = 10000):
+        mask = labels_layer.data
+        labels_layer.data = remove_large_foregroundregions(mask, min_size=min_size)
+        print(f"  Removed regions larger than {min_size} px.")
+    
+    # (added to viewer below, using container)
+    
+    # ----- dock widgets as a single stacked panel ------------------------------
+    tools_container = Container(widgets=[shift_widget, remove_small_widget, remove_large_widget])
+    viewer.window.add_dock_widget(tools_container, name="Tools")
 
     # ----- keybinding: q = quit without saving --------------------------------
     @viewer.bind_key('q')
@@ -516,6 +581,14 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     
     # Run napari (blocks until the viewer is closed)
     napari.run()
+    
+    # Restore IPython GUI event loop if it was active before
+    if _prev_gui is not None:
+        try:
+            ipython.run_line_magic('gui', _prev_gui)
+            print("Re-establishing Spyder %gui setting ("+_prev_gui+")")
+        except Exception:
+            pass
     
     # ----- after viewer is closed ---------------------------------------------
     if save_on_close[0]:
