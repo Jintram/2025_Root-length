@@ -7,6 +7,7 @@ to correct labeled masks using the default napari label-editing tools.
 
 Keybindings:
     q - quit the loop without saving the current file
+    n - go to the next file without saving the current file
     r - call a custom action on the mask at the current mouse position
 """
 
@@ -19,6 +20,7 @@ Keybindings:
 import os
 import shutil
 import glob
+from dataclasses import dataclass
 
 import numpy as np
 import napari
@@ -45,6 +47,22 @@ _SEARCH_RADIUS = 200
 _yy, _xx = np.mgrid[-_SEARCH_RADIUS:_SEARCH_RADIUS + 1,
                     -_SEARCH_RADIUS:_SEARCH_RADIUS + 1]
 _DIST_GRID = np.sqrt(_yy**2 + _xx**2).astype(np.float32)
+
+################################################################################
+# %% session state preserved across files
+
+@dataclass
+class EditorSessionState:
+    """Settings preserved across files during an editing session."""
+    # image translation (from the shift widget)
+    shift_x: int = 0
+    shift_y: int = 0
+    # size thresholds (from the remove-small/large widgets)
+    remove_small_min_size: int = 100
+    remove_large_max_size: int = 10000
+    # labels-layer interaction state
+    active_label: int = 1
+    brush_size: int = 10
 
 ################################################################################
 # %% helper: backup
@@ -424,16 +442,25 @@ def remove_large_foregroundregions(mask, min_size):
 # %% open napari for annotation editing
 
 def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
-                           title="Editing segmentation (for roots)"):
+                           title="Editing segmentation (for roots)",
+                           session_state=None):
     '''
     Opens napari with `image` as background and `segmentation` as an editable label
     layer, optionally styled with `mylabelcolormap`. Returns `(seg_data, quitloop_flag)`,
     where `seg_data` is the edited annotation (or None if quit) and `quitloop_flag`
     is True if the user pressed 'q'.
+
+    If `session_state` (an `EditorSessionState`) is provided, widget and layer
+    settings (shift, size thresholds, active label, brush size) are restored from
+    it on open and written back to it on close, so they persist across files.
     '''
-    
+
+    if session_state is None:
+        session_state = EditorSessionState()
+
     # Explain options to user
     print("____\nStarting Napari editor window\n===\nq=quit without saving,"+
+          "\nn=next file without saving,"+
           "\nr=draw root/shoot line, \nt=draw through-line, \nu=relabel by lines"+
           "\n____")
     
@@ -517,12 +544,60 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     tools_container = Container(widgets=[shift_widget, remove_small_widget, remove_large_widget])
     viewer.window.add_dock_widget(tools_container, name="Tools")
 
+    # ----- restore persisted session state ------------------------------------
+    shift_widget.shift_x.value = session_state.shift_x
+    shift_widget.shift_y.value = session_state.shift_y
+    if img_layer is not None:
+        img_layer.translate = (session_state.shift_y, session_state.shift_x)
+    remove_small_widget.min_size.value = session_state.remove_small_min_size
+    remove_large_widget.min_size.value = session_state.remove_large_max_size
+    labels_layer.selected_label = session_state.active_label
+    labels_layer.brush_size = session_state.brush_size
+    viewer.layers.selection.active = labels_layer
+
+    # ----- snapshot widget/layer state before Qt tears it down ----------------
+    # napari.run() returns *after* the Qt window is destroyed, at which point
+    # the underlying QSlider/QSpinBox objects are deleted and reading
+    # `magicgui_widget.value` raises "wrapped C/C++ object ... has been deleted".
+    # We therefore capture all values into a plain dict inside the Qt window's
+    # closeEvent (which fires before destruction) and copy them into
+    # session_state after napari.run() returns.
+    state_snapshot = {}
+
+    def _snapshot_state():
+        try:
+            state_snapshot['shift_x'] = int(shift_widget.shift_x.value)
+            state_snapshot['shift_y'] = int(shift_widget.shift_y.value)
+            state_snapshot['remove_small_min_size'] = int(remove_small_widget.min_size.value)
+            state_snapshot['remove_large_max_size'] = int(remove_large_widget.min_size.value)
+            state_snapshot['active_label'] = int(labels_layer.selected_label)
+            state_snapshot['brush_size'] = int(labels_layer.brush_size)
+        except Exception as e:
+            print(f"  Warning: could not snapshot session state: {e}")
+
+    qt_window = viewer.window._qt_window
+    _original_close_event = qt_window.closeEvent
+
+    def _close_event_with_snapshot(event):
+        _snapshot_state()
+        _original_close_event(event)
+
+    qt_window.closeEvent = _close_event_with_snapshot
+
     # ----- keybinding: q = quit without saving --------------------------------
     @viewer.bind_key('q')
     def _quit_without_saving(viewer):
         """Close viewer without saving, and signal to quit the loop."""
         print("  'q' pressed — closing without saving, quitting loop.")
         quit_requested[0] = True
+        save_on_close[0] = False
+        viewer.close()
+    
+    # ----- keybinding: n = next file without saving ---------------------------
+    @viewer.bind_key('n')
+    def _next_without_saving(viewer):
+        """Close viewer without saving, continue to the next file."""
+        print("  'n' pressed — closing without saving, moving to next file.")
         save_on_close[0] = False
         viewer.close()
     
@@ -581,7 +656,18 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     
     # Run napari (blocks until the viewer is closed)
     napari.run()
-    
+
+    # ----- persist snapshotted state back to session_state --------------------
+    # `state_snapshot` was populated by the closeEvent hook above, while the
+    # Qt widgets were still alive.
+    if state_snapshot:
+        session_state.shift_x = state_snapshot['shift_x']
+        session_state.shift_y = state_snapshot['shift_y']
+        session_state.remove_small_min_size = state_snapshot['remove_small_min_size']
+        session_state.remove_large_max_size = state_snapshot['remove_large_max_size']
+        session_state.active_label = state_snapshot['active_label']
+        session_state.brush_size = state_snapshot['brush_size']
+
     # Restore IPython GUI event loop if it was active before
     if _prev_gui is not None:
         try:
@@ -600,7 +686,7 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
 ################################################################################
 # %% edit a single segfile
 
-def edit_segfile_single(curr_file, dir_imagefiles=None):
+def edit_segfile_single(curr_file, dir_imagefiles=None, session_state=None):
     """
     Open a single segmentation file in napari for interactive editing.
     
@@ -612,6 +698,8 @@ def edit_segfile_single(curr_file, dir_imagefiles=None):
     Input parameters:
     - curr_file: a fileinfo object (from root_length.functions_files.filelisting) pointing
       to the .npz segmentation file.
+    - session_state: optional EditorSessionState, preserving widget/layer settings
+      across calls (e.g. when looping over many files).
     
     Returns:
     - quit_requested: bool, True if the user pressed "q" to quit.
@@ -619,7 +707,7 @@ def edit_segfile_single(curr_file, dir_imagefiles=None):
     
     # Load labeled mask from the .npz file
     segfile_path = curr_file.fullpath
-    segfile_data = np.load(segfile_path)
+    segfile_data = np.load(segfile_path, allow_pickle=True)
     img_mask = segfile_data['img_pred_lbls']
     # Preserve any extra arrays (e.g. prepr_info) for re-saving later
     extra_arrays = {k: segfile_data[k] for k in segfile_data.files
@@ -638,10 +726,17 @@ def edit_segfile_single(curr_file, dir_imagefiles=None):
         # If unique hit found, load
         if len(file_hits) == 1:
             img_original = skio.imread(file_hits[0])
-            # Check if crop info is available, if so, load   
+            
+            # Check if crop info is available, if so, load
             print("Checking for cropping info..")
-            if 'prepr_info' in extra_arrays:
-                crop_rect = extra_arrays['prepr_info']
+            # Load crop_rect, and handle incvonenient formatting
+            # (TO DO: at save time, skip writing when is None)
+            crop_rect = extra_arrays.get('prepr_info')
+            # Handle array(None) or array([]) cases
+            if isinstance(crop_rect, np.ndarray) and crop_rect.ndim == 0:
+                crop_rect = crop_rect.item()
+            # Load info
+            if (crop_rect is not None):
                 minr, maxr, minc, maxc = crop_rect
                 img_original = img_original[minr:maxr, minc:maxc]
                 # plt.imshow(img_original)
@@ -654,7 +749,8 @@ def edit_segfile_single(curr_file, dir_imagefiles=None):
         image=img_original,
         segmentation=img_mask,
         mylabelcolormap=plutils.custom_colors_plantclasses,
-        title=f"Editing: {curr_file.filename}",
+        title=f"Editing: {curr_file.filename} ({curr_file.subdir})",
+        session_state=session_state,
     )
     
     # Save or skip based on napari result
@@ -675,7 +771,8 @@ def edit_segfile_single(curr_file, dir_imagefiles=None):
 ################################################################################
 # %% edit all segfiles
 
-def edit_all_segfiles(df_filelist, dir_inputfiles, dir_imagefiles=None):
+def edit_all_segfiles(df_filelist, dir_inputfiles, dir_imagefiles=None,
+                      session_state=None):
     """
     Loop over all segmentation files and open each in napari for editing.
     
@@ -688,10 +785,16 @@ def edit_all_segfiles(df_filelist, dir_inputfiles, dir_imagefiles=None):
     - df_filelist: pd.DataFrame with columns 'basedir', 'subdir', 'filename'.
     - dir_inputfiles: str, the base directory for the segmentation files
       (used as the outputdir placeholder in fileinfo, since we save in-place).
+    - session_state: optional EditorSessionState. If None, a fresh one is created
+      so that widget/layer settings (shift, size thresholds, active label, brush
+      size) are preserved across files within this loop.
     """
-    
+
+    if session_state is None:
+        session_state = EditorSessionState()
+
     for file_idx in range(len(df_filelist)):
-        # file_idx = 200
+        # file_idx = 0
         
         # Get file info
         basedir, subdir, filename = \
@@ -702,7 +805,8 @@ def edit_all_segfiles(df_filelist, dir_inputfiles, dir_imagefiles=None):
         print(f"Editing file {file_idx+1}/{len(df_filelist)}: {curr_file.fullpath}")
         
         # Open for editing
-        quit_requested = edit_segfile_single(curr_file, dir_imagefiles)
+        quit_requested = edit_segfile_single(curr_file, dir_imagefiles,
+                                             session_state=session_state)
         
         if quit_requested:
             print("Loop terminated by user (pressed 'q').")
