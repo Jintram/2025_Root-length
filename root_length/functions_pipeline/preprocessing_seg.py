@@ -59,7 +59,8 @@ def preprocess_getbbox_insideplate(img_in_raw, margin_left = 100, margin_right =
                                          min_expected_area = 500000):
     # img_in_raw = img_toseg    
     # margin_left = 100; margin_right = 100; margin_top = 250; margin_bottom = 250; min_expected_area = 500000
-    
+    # margin_left = 0.05; margin_right = 0.05; margin_top = 0.05; margin_bottom = 0.05; min_expected_area = 500000
+       
     # convert to greyscale
     img_in_gray = rgb2gray(img_in_raw)
         # plt.hist(img_in_gray.ravel()); plt.show()
@@ -99,8 +100,25 @@ def preprocess_getbbox_insideplate(img_in_raw, margin_left = 100, margin_right =
 def preprocess_getbbox_insideplate2(img_in_raw, margin_left = 100, margin_right = 100, 
                                          margin_top = 250, margin_bottom = 250,
                                          min_expected_area = 500000):
+    """
+    margins can be given as fraction of image size, or in pixels.
+    numbers >0 and <1 will be considered fractions.
+    
+    rect is built such that an image can be cropped as follows:
+    img[rect[0]:rect[1], rect[2]:rect[3]]
+    """
     # img_in_raw = img_toseg    
     # margin_left = 100; margin_right = 100; margin_top = 250; margin_bottom = 250; min_expected_area = 500000
+    
+    # convert relative margins to pixels if they are fraction
+    if (margin_left > 0) and (margin_left <1):
+        margin_left = int(img_in_raw.shape[1] * margin_left)
+    if (margin_right > 0 ) and (margin_right <1):
+        margin_right = int(img_in_raw.shape[1] * margin_right)
+    if (margin_top > 0) and (margin_top <1):
+        margin_top = int(img_in_raw.shape[0] * margin_top)
+    if (margin_bottom > 0) and (margin_bottom <1):
+        margin_bottom = int(img_in_raw.shape[0] * margin_bottom)
     
     # convert to greyscale
     img_in_gray = rgb2gray(img_in_raw)
