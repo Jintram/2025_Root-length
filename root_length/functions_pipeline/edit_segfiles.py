@@ -462,23 +462,30 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
                            title="Editing segmentation (for roots)",
                            session_state=None, curr_file=None):
     '''
-    Opens napari with `image` as background and `segmentation` as an editable label
-    layer, optionally styled with `mylabelcolormap`. Returns `(seg_data, quitloop_flag)`,
-    where `seg_data` is the edited annotation (or None if quit) and `quitloop_flag`
-    is True if the user pressed 'q'.
+    Opens napari with `image` as background and `segmentation` as an editable
+    label layer, optionally styled with `mylabelcolormap`.
+
+    Returns `(seg_data, return_requests)`, where `seg_data` is the edited
+    annotation (or None if the user chose not to save) and `return_requests`
+    is a dict carrying signals back to the caller. Currently used keys:
+        - 'quit_requested' (bool): user pressed 'q' to quit the outer loop.
+        - 'go_to' (int or None): user pressed 'j' and requested to jump to
+          this 1-based sample number (without saving).
+    Callers should treat unknown keys gracefully; new keys may be added.
 
     If `session_state` (an `EditorSessionState`) is provided, widget and layer
-    settings (shift, size thresholds, active label, brush size) are restored from
-    it on open and written back to it on close, so they persist across files.
+    settings (shift, size thresholds, active label, brush size) are restored
+    from it on open and written back to it on close, so they persist across
+    files.
 
     If `curr_file` is provided (a fileinfo-like object with `.fullpath`), a
     "Save now" button is added to the tools panel; clicking it writes the
     current labels layer back to the .npz via `_save_segfile`. If `curr_file`
-    is None, no save button is shown.
-    
+    is None, no save button is shown and the 'w' key is a no-op.
+
     # Note to self, already used by Napari:
     1, 2, 3, 4, 5, 6, 7, 8, 9, 0, [, ], -, =, a, d, e, f, i, l, m, p, s, v, z
-    # Used by this function: q, n, r, t, u, w
+    # Used by this function: q, n, r, t, u, w, j
     '''
 
     if session_state is None:
@@ -488,11 +495,12 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     print("____\nStarting Napari editor window\n===\nq=quit without saving,"+
           "\nn=next file without saving,"+
           "\nr=draw root/shoot line, \nt=draw through-line, \nu=relabel by lines,"+
-          "\nw=save current labels (if curr_file given)"+
+          "\nw=save current labels (if curr_file given),"+
+          "\nj=jump to sample number (handled by caller; closes without saving)"+
           "\n____")
-    
-    # State flags (use list to allow mutation inside nested functions)
-    quit_requested = [False]
+
+    # Signals returned to the caller. Mutated by key handlers below.
+    return_requests = {'quit_requested': False, 'go_to': None}
     save_on_close = [True]
     
     # Disable IPython event loop integration so that napari.run() blocks
@@ -626,7 +634,7 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     def _quit_without_saving(viewer):
         """Close viewer without saving, and signal to quit the loop."""
         print("  'q' pressed — closing without saving, quitting loop.")
-        quit_requested[0] = True
+        return_requests['quit_requested'] = True
         save_on_close[0] = False
         viewer.close()
     
@@ -701,6 +709,22 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
         print("  'w' pressed — saving current labels.")
         _save_segfile(curr_file, labels_layer.data)
 
+    # ----- keybinding: j = jump to a specific sample --------------------------
+    @viewer.bind_key('j')
+    def _run_jump_action(viewer):
+        """Ask for a sample number and signal the caller to jump there."""
+        from qtpy.QtWidgets import QInputDialog
+        num, ok = QInputDialog.getInt(
+            qt_window, "Jump to sample",
+            "Sample number (1-based):", 1, 1, 999999, 1)
+        if not ok:
+            print("  'j' pressed — jump cancelled.")
+            return
+        print(f"  'j' pressed — requesting jump to sample {num} (without saving).")
+        return_requests['go_to'] = num
+        save_on_close[0] = False
+        viewer.close()
+
     # Run napari (blocks until the viewer is closed)
     napari.run()
 
@@ -725,9 +749,9 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     
     # ----- after viewer is closed ---------------------------------------------
     if save_on_close[0]:
-        return labels_layer.data, quit_requested[0]
+        return labels_layer.data, return_requests
     else:
-        return None, quit_requested[0]
+        return None, return_requests
 
 
 ################################################################################
@@ -736,21 +760,19 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
 def edit_segfile_single(curr_file, dir_imagefiles=None, session_state=None):
     """
     Open a single segmentation file in napari for interactive editing.
-    
+
     The user can edit the labeled mask using default napari tools.
-    Keybindings:
-        q - close without saving, signal to quit the loop
-        r - call custom_mask_action at the current mouse position
-    
+    See `edit_annotation_napari` for the full keybinding list.
+
     Input parameters:
-    - curr_file: a fileinfo object (from root_length.functions_files.filelisting) pointing
-      to the .npz segmentation file.
-    - session_state: optional EditorSessionState, preserving widget/layer settings
-      across calls (e.g. when looping over many files).
-    
+    - curr_file: a fileinfo object (from root_length.functions_files.filelisting)
+      pointing to the .npz segmentation file.
+    - session_state: optional EditorSessionState, preserving widget/layer
+      settings across calls (e.g. when looping over many files).
+
     Returns:
-    - quit_requested: bool, True if the user pressed "q" to quit.
-    
+    - return_requests: dict forwarded from `edit_annotation_napari`. Currently
+      used keys: 'quit_requested' (bool), 'go_to' (int or None).
     """
     
     # Load labeled mask from the .npz file
@@ -793,7 +815,7 @@ def edit_segfile_single(curr_file, dir_imagefiles=None, session_state=None):
                 print("No cropping info found..")
     
     # Open napari for editing
-    seg_data, quit_requested = edit_annotation_napari(
+    seg_data, return_requests = edit_annotation_napari(
         image=img_original,
         segmentation=img_mask,
         mylabelcolormap=plutils.custom_colors_plantclasses,
@@ -808,7 +830,7 @@ def edit_segfile_single(curr_file, dir_imagefiles=None, session_state=None):
     else:
         print(f"  Not saved: {segfile_path}")
     
-    return quit_requested
+    return return_requests
 
 
 ################################################################################
@@ -836,24 +858,35 @@ def edit_all_segfiles(df_filelist, dir_inputfiles, dir_imagefiles=None,
     if session_state is None:
         session_state = EditorSessionState()
 
-    for file_idx in range(len(df_filelist)):
-        # file_idx = 0
-        
+    n_files = len(df_filelist)
+    file_idx = 0
+    while file_idx < n_files:
         # Get file info
         basedir, subdir, filename = \
             df_filelist.loc[file_idx, ['basedir', 'subdir', 'filename']]
         curr_file = ffl.fileinfo(basedir, subdir, filename, dir_inputfiles)
-        
+
         print("========================================================")
-        print(f"Editing file {file_idx+1}/{len(df_filelist)}: {curr_file.fullpath}")
-        
+        print(f"Editing file {file_idx+1}/{n_files}: {curr_file.fullpath}")
+
         # Open for editing
-        quit_requested = edit_segfile_single(curr_file, dir_imagefiles,
-                                             session_state=session_state)
-        
-        if quit_requested:
+        return_requests = edit_segfile_single(curr_file, dir_imagefiles,
+                                              session_state=session_state)
+
+        if return_requests['quit_requested']:
             print("Loop terminated by user (pressed 'q').")
             break
-    
+
+        if return_requests['go_to'] is not None:
+            # User asked to jump; clamp into valid range and convert to 0-based.
+            target = max(1, min(n_files, return_requests['go_to']))
+            if target != return_requests['go_to']:
+                print(f"  Requested sample {return_requests['go_to']} "
+                      f"out of range; clamped to {target}.")
+            file_idx = target - 1
+            return_requests['go_to'] = None
+        else:
+            file_idx += 1
+
     print("========================================================")
     print("Done editing segmentation files.")
