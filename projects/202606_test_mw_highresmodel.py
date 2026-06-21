@@ -15,8 +15,8 @@ import root_length.functions_pipeline.edit_segfiles as pledit
 # %% Gather the file list df.
 
 # dataset spcecific config
-DIR_INPUTFILES = '/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/202602/SEG/segfiles/'
-DIR_OUTPUTFILES = '/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/202602/LEN/'
+DIR_INPUTFILES = '/Users/m.wehrens/Data_notbacked/2025_hypocotyl_images/SEG_2026_highresmodel-crop/segfiles/'
+DIR_OUTPUTFILES = '/Users/m.wehrens/Data_notbacked/2025_hypocotyl_images/LEN_2026_highresmodel-crop/'
 
 # DIR_INPUTFILES = '/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/SELECTION_ML/model_seg/segfiles/'
 # DIR_OUTPUTFILES = '/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/SELECTION_ML/model_seg/segfiles/test/'

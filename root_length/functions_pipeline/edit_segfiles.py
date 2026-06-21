@@ -83,6 +83,23 @@ def _backup_if_needed(filepath):
         print(f"  Backup already exists: {backup_path}")
 
 
+def _save_segfile(curr_file, mask):
+    """
+    Save `mask` into `curr_file`'s .npz, preserving any other arrays on disk.
+
+    Re-reads the file to grab the current set of extra arrays (e.g. prepr_info),
+    so any external changes are not clobbered. A one-time backup is made before
+    the first overwrite via `_backup_if_needed`.
+    """
+    segfile_path = curr_file.fullpath
+    segfile_data = np.load(segfile_path, allow_pickle=True)
+    extra_arrays = {k: segfile_data[k] for k in segfile_data.files
+                    if k != 'img_pred_lbls'}
+    _backup_if_needed(segfile_path)
+    np.savez_compressed(segfile_path, img_pred_lbls=mask, **extra_arrays)
+    print(f"  Saved: {segfile_path}")
+
+
 ################################################################################
 # %% correct mask root/shoot line
 
@@ -443,7 +460,7 @@ def remove_large_foregroundregions(mask, min_size):
 
 def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
                            title="Editing segmentation (for roots)",
-                           session_state=None):
+                           session_state=None, curr_file=None):
     '''
     Opens napari with `image` as background and `segmentation` as an editable label
     layer, optionally styled with `mylabelcolormap`. Returns `(seg_data, quitloop_flag)`,
@@ -453,6 +470,15 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     If `session_state` (an `EditorSessionState`) is provided, widget and layer
     settings (shift, size thresholds, active label, brush size) are restored from
     it on open and written back to it on close, so they persist across files.
+
+    If `curr_file` is provided (a fileinfo-like object with `.fullpath`), a
+    "Save now" button is added to the tools panel; clicking it writes the
+    current labels layer back to the .npz via `_save_segfile`. If `curr_file`
+    is None, no save button is shown.
+    
+    # Note to self, already used by Napari:
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 0, [, ], -, =, a, d, e, f, i, l, m, p, s, v, z
+    # Used by this function: q, n, r, t, u, w
     '''
 
     if session_state is None:
@@ -461,7 +487,8 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     # Explain options to user
     print("____\nStarting Napari editor window\n===\nq=quit without saving,"+
           "\nn=next file without saving,"+
-          "\nr=draw root/shoot line, \nt=draw through-line, \nu=relabel by lines"+
+          "\nr=draw root/shoot line, \nt=draw through-line, \nu=relabel by lines,"+
+          "\nw=save current labels (if curr_file given)"+
           "\n____")
     
     # State flags (use list to allow mutation inside nested functions)
@@ -539,9 +566,19 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
         print(f"  Removed regions larger than {min_size} px.")
     
     # (added to viewer below, using container)
-    
+
+    # ----- widget: save current labels to disk --------------------------------
+    # Only available when curr_file was provided; otherwise the button is
+    # omitted entirely so the other repo's call sites are unaffected.
+    tool_widgets = [shift_widget, remove_small_widget, remove_large_widget]
+    if curr_file is not None:
+        @magicgui(call_button="Save now")
+        def save_widget():
+            _save_segfile(curr_file, labels_layer.data)
+        tool_widgets.append(save_widget)
+
     # ----- dock widgets as a single stacked panel ------------------------------
-    tools_container = Container(widgets=[shift_widget, remove_small_widget, remove_large_widget])
+    tools_container = Container(widgets=tool_widgets)
     viewer.window.add_dock_widget(tools_container, name="Tools")
 
     # ----- restore persisted session state ------------------------------------
@@ -653,7 +690,17 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
         mask = labels_layer.data
         mask = relabel_by_rootshootlines(mask)
         labels_layer.data = mask
-    
+
+    # ----- keybinding: w = save current labels to disk ------------------------
+    @viewer.bind_key('w')
+    def _run_save_action(viewer):
+        """Save the current labels layer to the .npz file (if curr_file given)."""
+        if curr_file is None:
+            print("  'w' pressed — Save function NOT available now.")
+            return
+        print("  'w' pressed — saving current labels.")
+        _save_segfile(curr_file, labels_layer.data)
+
     # Run napari (blocks until the viewer is closed)
     napari.run()
 
@@ -703,13 +750,14 @@ def edit_segfile_single(curr_file, dir_imagefiles=None, session_state=None):
     
     Returns:
     - quit_requested: bool, True if the user pressed "q" to quit.
+    
     """
     
     # Load labeled mask from the .npz file
     segfile_path = curr_file.fullpath
     segfile_data = np.load(segfile_path, allow_pickle=True)
     img_mask = segfile_data['img_pred_lbls']
-    # Preserve any extra arrays (e.g. prepr_info) for re-saving later
+    # Preserve any extra arrays (e.g. prepr_info) for cropping use below
     extra_arrays = {k: segfile_data[k] for k in segfile_data.files
                     if k != 'img_pred_lbls'}
     
@@ -751,17 +799,12 @@ def edit_segfile_single(curr_file, dir_imagefiles=None, session_state=None):
         mylabelcolormap=plutils.custom_colors_plantclasses,
         title=f"Editing: {curr_file.filename} ({curr_file.subdir})",
         session_state=session_state,
+        curr_file=curr_file,
     )
     
     # Save or skip based on napari result
     if seg_data is not None:
-        # Create backup before first save
-        _backup_if_needed(segfile_path)
-        
-        # Save the (possibly edited) mask back to the .npz file
-        np.savez_compressed(segfile_path, img_pred_lbls=seg_data,
-                            **extra_arrays)
-        print(f"  Saved: {segfile_path}")
+        _save_segfile(curr_file, seg_data)
     else:
         print(f"  Not saved: {segfile_path}")
     

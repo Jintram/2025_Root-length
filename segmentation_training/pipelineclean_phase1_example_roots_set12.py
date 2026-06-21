@@ -24,9 +24,9 @@ import cheeky_cells.prepostprocessing_input.ara_roots.ara_plotting as arootp
 # Configuration
 
 # Directory where to find the images that you want to annotate
-INPUTDIRECTORY = "/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/TRAININGDIR_SET-1n2_20260618/originals/"
+INPUTDIRECTORY = "/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/TRAININGDIR_SET-1n2_20260618_cleaned/originals/"
 # Directory with model-training related data (trained model itself, training data, ..)
-TRAINING_DIR = "/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/TRAININGDIR_SET-1n2_20260618/"
+TRAINING_DIR = "/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/TRAININGDIR_SET-1n2_20260618_cleaned/"
 
 # Configuration for this dataset
 config1 = o1.Phase1Config(
@@ -48,34 +48,27 @@ config1 = o1.Phase1Config(
 # COMMENT THIS OUT IF YOU DON'T HAVE ALREADY SEGMENTED DATA
 # THE DIRECTORY segfiles_humancorr SHOULD BE MANUALLY CREATED
 # SEE: documentation/use-segresults-newtraining.md
-# config1.segfolder = os.path.join(config1.training_dir, 'segfiles_humancorr/')
+config1.segfolder = os.path.join(config1.training_dir, 'humanseg/')
 
 o1.phase1_setup(config1)
 
 # %% ###########################################################################
 # Running it
 
-FIX THIS!! SOMEHOW THIS GENERATES NEW FILES, BUT THAT'S NOT WHAT'S INTENDED
+# First, adjust the metadata_imagefiles_autogen.xlsx as required
+# (and rename it to avoid overwriting behavior).
+# Set the path to the metadata file below
+METADATA_FILE = \
+    config1.training_dir + "metadata_imagefiles_manual.xlsx"
 
-SEE DIR
-/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/TRAININGDIR_SET-1n2_20260618
-
-if False:
-
-    # First, adjust the metadata_imagefiles_autogen.xlsx as required
-    # (and rename it to avoid overwriting behavior).
-    # Set the path to the metadata file below
-    METADATA_FILE = \
-        config1.training_dir + "metadata_imagefiles_autogen.xlsx"
-
-    # Update config1 accordingly
-    config1.metadatafiles_path = METADATA_FILE
-        
-    # to use a custom napari edit function (not required, but can be convenient)  
-    import root_length.functions_pipeline.edit_segfiles as pl_edit
-        # import importlib; importlib.reload(pl_edit)
-    config1.my_napari_function = pl_edit.edit_annotation_napari
-        
-    # now create annotated pictures
-    o1.phase1_annotate(config1)
+# Update config1 accordingly
+config1.metadatafiles_path = METADATA_FILE
+    
+# to use a custom napari edit function (not required, but can be convenient)  
+import root_length.functions_pipeline.edit_segfiles as pl_edit
+    # import importlib; importlib.reload(pl_edit)
+config1.my_napari_function = pl_edit.edit_annotation_napari
+    
+# now create annotated pictures
+o1.phase1_annotate(config1)
 # %%
