@@ -468,7 +468,7 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     Returns `(seg_data, return_requests)`, where `seg_data` is the edited
     annotation (or None if the user chose not to save) and `return_requests`
     is a dict carrying signals back to the caller. Currently used keys:
-        - 'quit_requested' (bool): user pressed 'q' to quit the outer loop.
+        - 'quitloop_flag' (bool): user pressed 'q' to quit the outer loop.
         - 'go_to' (int or None): user pressed 'j' and requested to jump to
           this 1-based sample number (without saving).
     Callers should treat unknown keys gracefully; new keys may be added.
@@ -500,7 +500,7 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
           "\n____")
 
     # Signals returned to the caller. Mutated by key handlers below.
-    return_requests = {'quit_requested': False, 'go_to': None}
+    return_requests = {'quitloop_flag': False, 'go_to': None}
     save_on_close = [True]
     
     # Disable IPython event loop integration so that napari.run() blocks
@@ -634,7 +634,7 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     def _quit_without_saving(viewer):
         """Close viewer without saving, and signal to quit the loop."""
         print("  'q' pressed — closing without saving, quitting loop.")
-        return_requests['quit_requested'] = True
+        return_requests['quitloop_flag'] = True
         save_on_close[0] = False
         viewer.close()
     
@@ -772,7 +772,7 @@ def edit_segfile_single(curr_file, dir_imagefiles=None, session_state=None):
 
     Returns:
     - return_requests: dict forwarded from `edit_annotation_napari`. Currently
-      used keys: 'quit_requested' (bool), 'go_to' (int or None).
+      used keys: 'quitloop_flag' (bool), 'go_to' (int or None).
     """
     
     # Load labeled mask from the .npz file
@@ -873,7 +873,7 @@ def edit_all_segfiles(df_filelist, dir_inputfiles, dir_imagefiles=None,
         return_requests = edit_segfile_single(curr_file, dir_imagefiles,
                                               session_state=session_state)
 
-        if return_requests['quit_requested']:
+        if return_requests['quitloop_flag']:
             print("Loop terminated by user (pressed 'q').")
             break
 
