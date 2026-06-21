@@ -117,6 +117,15 @@ running the relevant pipeline script or by importing the modified module.
 
 - `pyproject.toml` declares `dependencies = []`. Runtime deps come from conda;
   `pip install -e .` only registers the package.
+- The image files can either (or both)
+    - be cropped before segmenting them, in which case
+the segfiles will be cropped. To translate from the original images, the
+stored parameter `prepr_info` in the segfile contains the cropping information. 
+    - have a cropping recteangle attached that was determined afterwards, 
+    which is stored in the parameter `mask_rect` in the segfile. 
+    Depending on settings, the segfile might be cleaned outside that mask
+    by the `compute_and_save_mask_rect_all` function.
+
 
 ---
 

@@ -18,6 +18,7 @@ class fileinfo:
         subdir:  str
         filename: str
         outputdir: str | None = None
+        file_idx: int | None = None # optional, for display
         @property
         def fullpath(self) -> str:
             return os.path.join(self.basedir, self.subdir, self.filename)

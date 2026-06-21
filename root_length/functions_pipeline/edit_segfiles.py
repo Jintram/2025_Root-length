@@ -462,7 +462,8 @@ def remove_large_foregroundregions(mask, min_size):
 
 def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
                            title="Editing segmentation (for roots)",
-                           session_state=None, curr_file=None):
+                           session_state=None, curr_file=None,
+                           extras=None):
     '''
     Opens napari with `image` as background and `segmentation` as an editable
     label layer, optionally styled with `mylabelcolormap`.
@@ -492,6 +493,8 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
 
     if session_state is None:
         session_state = EditorSessionState()
+    if extras is None:
+        extras = {}
 
     # Explain options to user
     print("____\nStarting Napari editor window\n===\nq=quit without saving,"+
@@ -538,6 +541,20 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     if mylabelcolormap is not None:
         labels_kwargs['colormap'] = mylabelcolormap
     labels_layer = viewer.add_labels(segmentation, **labels_kwargs)
+
+    # ----- overlay: read-only mask_rect rectangle ----------------------------
+    mask_rect = extras.get('mask_rect')
+    if isinstance(mask_rect, np.ndarray) and mask_rect.ndim == 0:
+        mask_rect = mask_rect.item()
+    if mask_rect is not None and len(np.asarray(mask_rect).ravel()) == 4:
+        r0, r1, c0, c1 = (int(v) for v in np.asarray(mask_rect).ravel())
+        corners = np.array([[r0, c0], [r0, c1], [r1, c1], [r1, c0]])
+        rect_layer = viewer.add_shapes(
+            corners, shape_type='rectangle',
+            edge_color='red', face_color='transparent',
+            edge_width=4, name='mask_rect',
+        )
+        rect_layer.editable = False
 
     # ----- widget: shift image layer visually ---------------------------------
     @magicgui(
@@ -821,9 +838,10 @@ def edit_segfile_single(curr_file, dir_imagefiles=None, session_state=None):
         image=img_original,
         segmentation=img_mask,
         mylabelcolormap=plutils.custom_colors_plantclasses,
-        title=f"Editing: {curr_file.filename} ({curr_file.subdir})",
+        title=f"Editing #{curr_file.file_idx+1}: {curr_file.filename} ({curr_file.subdir})",
         session_state=session_state,
         curr_file=curr_file,
+        extras = {'mask_rect': extra_arrays.get('mask_rect', None)},
     )
     
     # Save or skip based on napari result
@@ -863,18 +881,23 @@ def edit_all_segfiles(df_filelist, dir_inputfiles, dir_imagefiles=None,
     n_files = len(df_filelist)
     file_idx = 0
     while file_idx < n_files:
+        
+        ### Basic stuff -------
         # Get file info
         basedir, subdir, filename = \
             df_filelist.loc[file_idx, ['basedir', 'subdir', 'filename']]
-        curr_file = ffl.fileinfo(basedir, subdir, filename, dir_inputfiles)
+        curr_file = ffl.fileinfo(basedir, subdir, filename, dir_inputfiles,
+                                 file_idx = file_idx)
 
         print("========================================================")
         print(f"Editing file {file_idx+1}/{n_files}: {curr_file.fullpath}")
 
-        # Open for editing
+        ### Call Napari, open for editing -------
         return_requests = edit_segfile_single(curr_file, dir_imagefiles,
                                               session_state=session_state)
 
+
+        ### Handling final admin -------
         if return_requests['quitloop_flag']:
             print("Loop terminated by user (pressed 'q').")
             break
@@ -898,9 +921,11 @@ def edit_all_segfiles(df_filelist, dir_inputfiles, dir_imagefiles=None,
 # %% compute & save plate-area rect into each segfile
 
 def compute_and_save_mask_rect_all(df_filelist, dir_inputfiles, dir_imagefiles,
+                                   clear_outside_mask,
+                                   only_process_n=None,
                                    overwrite=False,
                                    margin_left=0.05, margin_right=0.05,
-                                   margin_top=0.05, margin_bottom=0.05,
+                                   margin_top=0.1, margin_bottom=0.1,
                                    min_expected_area=0.5):
     """
     Compute a plate-area rect per file and store it as `mask_rect` in the .npz.
@@ -913,6 +938,15 @@ def compute_and_save_mask_rect_all(df_filelist, dir_inputfiles, dir_imagefiles,
     The mask itself is not stored — reconstruct it via
     `root_length.functions_pipeline.preprocessing.rect_to_mask(rect, shape)`.
 
+    Parameters:
+    - clear_outside_mask: if True, also zero out the segmentation labels
+      (`img_pred_lbls`) outside the computed rect before saving. Required
+      (no default) so the user must explicitly choose.
+    - only_process_n: int or None. If int, only the first N rows of df_filelist
+      are processed (useful for test runs); after that the loop exits. Default
+      None processes all files.
+    - overwrite: if True, recompute and overwrite an existing `mask_rect`.
+
     Notes:
     - If the segfile already has a `prepr_info` crop rect, the original image is
       cropped to it first so that `mask_rect` lives in the same coordinate frame
@@ -923,6 +957,8 @@ def compute_and_save_mask_rect_all(df_filelist, dir_inputfiles, dir_imagefiles,
     """
 
     n_files = len(df_filelist)
+    if only_process_n is not None:
+        n_files = min(n_files, only_process_n)
     for file_idx in range(n_files):
         basedir, subdir, filename = \
             df_filelist.loc[file_idx, ['basedir', 'subdir', 'filename']]
@@ -969,6 +1005,16 @@ def compute_and_save_mask_rect_all(df_filelist, dir_inputfiles, dir_imagefiles,
             margin_left=margin_left, margin_right=margin_right,
             margin_top=margin_top, margin_bottom=margin_bottom,
             min_expected_area=min_expected_area)
+
+        # Optionally clear seg labels outside the rect
+        if clear_outside_mask and ('img_pred_lbls' in existing):
+            seg = existing['img_pred_lbls'].copy()
+            mask_keep = np.zeros(seg.shape, dtype=bool)
+            r0, r1, c0, c1 = rect
+            mask_keep[r0:r1, c0:c1] = True
+            seg[~mask_keep] = 0
+            existing['img_pred_lbls'] = seg
+            print("  Cleared seg labels outside rect.")
 
         # Save (preserve all existing keys, add/overwrite mask_rect)
         _backup_if_needed(segfile_path)
