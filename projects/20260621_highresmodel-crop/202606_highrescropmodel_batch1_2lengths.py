@@ -73,6 +73,12 @@ pledit.edit_all_segfiles(df_filelist=df_filelist,
 
 ################################################################################
 # %% Run the analysis
+
+# test run
+plap.analyze_all_plates(df_filelist=df_filelist[:10],
+                        output_dir=DIR_OUTPUTFILES)
+
+# full run
 plap.analyze_all_plates(df_filelist=df_filelist,
                         output_dir=DIR_OUTPUTFILES)
 

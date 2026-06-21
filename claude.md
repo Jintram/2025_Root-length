@@ -85,6 +85,8 @@ This project uses **conda**, not pip-managed virtualenvs.
 `pytest`, `ruff`, or `make test` — they will not exist. Validate changes by
 running the relevant pipeline script or by importing the modified module.
 
+This repo runs in `cheeky-all` conda env, ie `conda activate cheeky-all`.
+
 ---
 
 ## Conventions

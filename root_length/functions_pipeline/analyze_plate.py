@@ -124,13 +124,15 @@ def analyze_plate(curr_file):
     plt.close(fig)
     
     # moreover, save the data to a .csv file
-    # (cols: plant index and "root length")
+    # (cols: plant index and root + shoot lengths)
     df_out = pd.DataFrame({
         "sample_identifier": curr_file.filebasename,
         "subdir": curr_file.subdir,
         "plant_index": np.arange(len(current_sample_all_plants)),
-        "length_pixels": [plant.length_pixels for plant in current_sample_all_plants],
-        "length_mm": [plant.length_mm for plant in current_sample_all_plants]
+        "root_length_pixels": [plant.root_length_pixels for plant in current_sample_all_plants],
+        "root_length_mm": [plant.root_length_mm for plant in current_sample_all_plants],
+        "shoot_length_pixels": [plant.shoot_length_pixels for plant in current_sample_all_plants],
+        "shoot_length_mm": [plant.shoot_length_mm for plant in current_sample_all_plants]
     })
     output_filename = curr_file.filebasename + "_lengths.tsv"
     df_out.to_csv(

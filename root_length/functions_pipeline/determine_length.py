@@ -40,7 +40,12 @@ KERNEL_NEIGHBOR_COUNT = np.array(
 
 @dataclass
 class RootSample:
-    """Container for one plant/root sample during processing."""
+    """Container for one plant sample (root + shoot) during processing.
+
+    Per-tissue intermediates exist for both "root" and "shoot"; the processing
+    functions select which one to use via a `tissue: str` parameter and
+    read/write the matching `{tissue}_<field>` attribute via getattr/setattr.
+    """
 
     root_mask: np.ndarray
     shoot_mask: np.ndarray
@@ -48,121 +53,148 @@ class RootSample:
     pixel_size_mm: float | None = None
 
     clean_root_mask: np.ndarray | None = None
+    clean_shoot_mask: np.ndarray | None = None
+
     root_skeleton: np.ndarray | None = None
+    shoot_skeleton: np.ndarray | None = None
     root_skeleton_nobranchpoints: np.ndarray | None = None
-    branchpoint_coords: np.ndarray | None = None
-    endpoint_coords: np.ndarray | None = None
+    shoot_skeleton_nobranchpoints: np.ndarray | None = None
 
-    labeled_segments: np.ndarray | None = None
-    segment_graph: nx.Graph | None = None
+    root_branchpoint_coords: np.ndarray | None = None
+    shoot_branchpoint_coords: np.ndarray | None = None
+    root_endpoint_coords: np.ndarray | None = None
+    shoot_endpoint_coords: np.ndarray | None = None
 
-    start_label: int | None = None
-    longest_path: list[int] | None = None
-    length_pixels: float | None = None
-    length_mm: float | None = None
-    
+    root_labeled_segments: np.ndarray | None = None
+    shoot_labeled_segments: np.ndarray | None = None
+    root_segment_graph: nx.Graph | None = None
+    shoot_segment_graph: nx.Graph | None = None
+
+    root_start_label: int | None = None
+    shoot_start_label: int | None = None
+    root_longest_path: list[int] | None = None
+    shoot_longest_path: list[int] | None = None
+
+    root_length_pixels: float | None = None
+    shoot_length_pixels: float | None = None
+    root_length_mm: float | None = None
+    shoot_length_mm: float | None = None
+
     # position of the bbox in the original image
     bbox: tuple[int, int, int, int] | None = None
-    
-    mask_longest_root_path: np.ndarray | None = None
+
+    mask_longest_path_root: np.ndarray | None = None
+    mask_longest_path_shoot: np.ndarray | None = None
 
 
 ################################################################################
 # %% Basic preprocessing
 
 
-def ensure_binary_root_mask(sample: RootSample) -> RootSample:
-    """ Simply convert root_mask to boolean and return. """
-    
-    # Convert to boolean
-    sample.root_mask = sample.root_mask.astype(bool)
-    
+def ensure_binary_mask(sample: RootSample, tissue: str) -> RootSample:
+    """Convert the `{tissue}_mask` to boolean in place and return the sample."""
+
+    mask_attr = f"{tissue}_mask"
+    setattr(sample, mask_attr, getattr(sample, mask_attr).astype(bool))
+
     return sample
 
-def keep_largest_connected_root_component(sample: RootSample) -> RootSample:
+def keep_largest_connected_component(sample: RootSample, tissue: str) -> RootSample:
     """
-    Keep only the largest root object in the root mask.
-    
-    In principle, an ideal mask only contains one root ROI. However, it might
-    occur that there are other parts of the plants labeled as root, that are
-    not connected to the main root area. 
-    In this case, we want to focus on the main root area. Therefor, this
-    function analyzes the root areas, and retains the largest region only.
-    
-    This is then stored in sample.clean_root_mask.
+    Keep only the largest connected object in the `{tissue}_mask`.
+
+    In principle, an ideal mask only contains one ROI per tissue. However, it
+    might occur that other parts of the plant are labeled as the same tissue
+    but not connected to the main area. We want to focus on the main area,
+    so this function analyzes the regions, warns if multiple are present,
+    and retains the largest one only. Result is stored in `clean_{tissue}_mask`.
     """
-    
-    # Create labeled mask and props for the *root* mask
-    labeled = label(sample.root_mask)
+
+    mask = getattr(sample, f"{tissue}_mask")
+    clean_attr = f"clean_{tissue}_mask"
+
+    # Create labeled mask and props for the tissue mask
+    labeled = label(mask)
     props = regionprops(labeled)
-    
-    # In case there's no root at all
+
+    # In case there's nothing at all
     if not props:
-        sample.clean_root_mask = np.zeros_like(sample.root_mask, dtype=bool)
+        setattr(sample, clean_attr, np.zeros_like(mask, dtype=bool))
         return sample
+
+    # Warn (but continue) if multiple components were found
+    if len(props) > 1:
+        warnings.warn(
+            f"{tissue} mask has {len(props)} connected components, keeping largest"
+        )
 
     # obtain the region properties element corresponding to the largest region
     def get_region_area(region):
         return region.area
     largest_region = max(props, key=get_region_area)
-    
+
     # Now create a new mask, corresponding to the largest region
-    sample.clean_root_mask = (labeled == largest_region.label)    
-        # plt.imshow(sample.clean_root_mask)
-    
+    setattr(sample, clean_attr, (labeled == largest_region.label))
+        # plt.imshow(getattr(sample, clean_attr))
+
     return sample
 
 ################################################################################
 # %% Branch analysis
 
-def generate_root_skeleton_no_branchpoints(sample: RootSample) -> RootSample:
-    """Skeletonize root mask and remove branch-point pixels from that skeleton."""
+def generate_skeleton_no_branchpoints(sample: RootSample, tissue: str) -> RootSample:
+    """Skeletonize `clean_{tissue}_mask` and remove branch-point pixels."""
+
+    clean_mask = getattr(sample, f"clean_{tissue}_mask")
 
     # Obtain the skeleton
-    sample.root_skeleton = morphology.skeletonize(sample.clean_root_mask)
+    skeleton = morphology.skeletonize(clean_mask)
+    setattr(sample, f"{tissue}_skeleton", skeleton)
 
-    # Create an equal-sized array that gives the neighbor count for each pixel 
-    # in root_skeleton.
+    # Create an equal-sized array that gives the neighbor count for each pixel
+    # in the skeleton.
     neighbor_counts = convolve(
-        sample.root_skeleton.astype(int),
+        skeleton.astype(int),
         KERNEL_NEIGHBOR_COUNT,
         mode="constant",
         cval=0,
     )
 
-    # Now only keep parts of the skeleton that have 2 neighbors
-    sample.root_skeleton_nobranchpoints = \
-        sample.root_skeleton & (neighbor_counts <= 2)
-        # plt.imshow(sample.root_skeleton_nobranchpoints)
-        
-    # and collect the x,y locations of both the branch points as 
+    # Now only keep parts of the skeleton that have <=2 neighbors
+    setattr(sample, f"{tissue}_skeleton_nobranchpoints",
+            skeleton & (neighbor_counts <= 2))
+        # plt.imshow(getattr(sample, f"{tissue}_skeleton_nobranchpoints"))
+
+    # and collect the x,y locations of both the branch points as
     # well as the end points.
     # Locations of branch points
-    sample.branchpoint_coords = np.column_stack(
-        np.where(sample.root_skeleton & (neighbor_counts > 2))
-    )
+    setattr(sample, f"{tissue}_branchpoint_coords",
+            np.column_stack(np.where(skeleton & (neighbor_counts > 2))))
     # Locations of end points
-    sample.endpoint_coords = np.column_stack(
-        np.where(sample.root_skeleton & (neighbor_counts == 1))
-    )
-    
+    setattr(sample, f"{tissue}_endpoint_coords",
+            np.column_stack(np.where(skeleton & (neighbor_counts == 1))))
+
     return sample
 
 
-def label_skeleton_segments(sample: RootSample) -> RootSample:
+def label_skeleton_segments(sample: RootSample, tissue: str) -> RootSample:
     """Label line segments in skeleton and assign separate labels to nodes."""
 
+    skeleton_nobp = getattr(sample, f"{tissue}_skeleton_nobranchpoints")
+    branchpoint_coords = getattr(sample, f"{tissue}_branchpoint_coords")
+    endpoint_coords = getattr(sample, f"{tissue}_endpoint_coords")
+
     # Now get the labeled skeleton
-    labeled_segments = morphology.label(sample.root_skeleton_nobranchpoints)
+    labeled_segments = morphology.label(skeleton_nobp)
     max_label = int(labeled_segments.max())
         # plt.imshow(labeled_segments)
 
     # Collect a list of pixel locations that require to be assigned a new label
     pixel_coords_list = []
-    if sample.branchpoint_coords is not None and sample.branchpoint_coords.size > 0:
-        pixel_coords_list.append(sample.branchpoint_coords)
-    if sample.endpoint_coords is not None and sample.endpoint_coords.size > 0:
-        pixel_coords_list.append(sample.endpoint_coords)
+    if branchpoint_coords is not None and branchpoint_coords.size > 0:
+        pixel_coords_list.append(branchpoint_coords)
+    if endpoint_coords is not None and endpoint_coords.size > 0:
+        pixel_coords_list.append(endpoint_coords)
 
     # Now loop over those pixels (if available)
     if pixel_coords_list:
@@ -170,10 +202,10 @@ def label_skeleton_segments(sample: RootSample) -> RootSample:
         for idx, coord in enumerate(pixel_coords):
             labeled_segments[coord[0], coord[1]] = idx + max_label + 1
 
-    sample.labeled_segments = labeled_segments
-    
-    # plt.imshow(sample.labeled_segments)
-    
+    setattr(sample, f"{tissue}_labeled_segments", labeled_segments)
+
+    # plt.imshow(getattr(sample, f"{tissue}_labeled_segments"))
+
     return sample
 
 
@@ -250,21 +282,23 @@ def plot_graph_nodesize(G, size_metric="length"):
     return fig, ax
 
 
-def build_segment_graph(sample: RootSample) -> RootSample:
+def build_segment_graph(sample: RootSample, tissue: str) -> RootSample:
     """
     Create a graph where each segment label is one node.
-    
+
     Note that there is a small imprecision here, as branch point pixels
-    have length = 0.5. (This could lead to the longest path that will be 
+    have length = 0.5. (This could lead to the longest path that will be
     identified later not actually being the longest, in extreme edge cases.
-    The root length calculated later will include these pixels, as then the
+    The length calculated later will include these pixels, as then the
     length is calculated again.)
     """
-    
+
+    labeled_segments = getattr(sample, f"{tissue}_labeled_segments")
+
     # Obtain unique segment labels
-    unique_labels = np.unique(sample.labeled_segments)
+    unique_labels = np.unique(labeled_segments)
     unique_labels = unique_labels[unique_labels != 0]
-    
+
     # Initialize a graph using unique labels
     # (Connections are added below)
     graph = nx.Graph()
@@ -276,13 +310,13 @@ def build_segment_graph(sample: RootSample) -> RootSample:
     # Loop over each segment
     for label_id in unique_labels:
         # Get segment-specific mask
-        current_mask = sample.labeled_segments == label_id
+        current_mask = labeled_segments == label_id
         # Dilate it
         dilated_mask = morphology.binary_dilation(current_mask, structure_all8neihbors)
 
         # Now from the dilated mask collect labels in the original mask,
         # thus collecting neighboring segment lables
-        neighboring_pixels = sample.labeled_segments[dilated_mask]
+        neighboring_pixels = labeled_segments[dilated_mask]
         neighbor_labels = np.unique(neighboring_pixels)
         # exclude self and zero
         neighbor_labels = neighbor_labels[
@@ -298,26 +332,35 @@ def build_segment_graph(sample: RootSample) -> RootSample:
         graph.nodes[int(label_id)]["length"] = get_length_segment(current_mask)
             # plt.imshow(current_mask)
 
-    sample.segment_graph = graph
-    
+    setattr(sample, f"{tissue}_segment_graph", graph)
+
     # plot_graph_nodesize(graph)
-    
+
     return sample
 
 
-def find_start_label_close_to_shoot(sample: RootSample) -> RootSample:
-    """Pick segment label nearest to `shoot_mask` (if provided)."""
+def find_start_label_close_to_other(sample: RootSample, tissue: str) -> RootSample:
+    """
+    Pick the segment label nearest to the *other* tissue's mask.
 
-    # now get distance map to shoot
-    distance_map = distance_transform_edt(~sample.shoot_mask.astype(bool))
+    For `tissue="root"`, the anchor is `shoot_mask` (root starts near shoot).
+    For `tissue="shoot"`, the anchor is `root_mask` (shoot starts near root).
+    """
+
+    other_tissue = "shoot" if tissue == "root" else "root"
+    anchor_mask = getattr(sample, f"{other_tissue}_mask")
+    labeled_segments = getattr(sample, f"{tissue}_labeled_segments")
+
+    # now get distance map to the anchor tissue
+    distance_map = distance_transform_edt(~anchor_mask.astype(bool))
     # disregard background pixels (set to inf distance)
-    distance_map[sample.labeled_segments == 0] = np.inf
+    distance_map[labeled_segments == 0] = np.inf
 
-    # and find the root pixel that is closest to shoot
+    # and find the pixel that is closest to the anchor tissue
     closest_pixel = np.unravel_index(np.argmin(distance_map), distance_map.shape)
     # and its corresponding label
-    sample.start_label = int(sample.labeled_segments[closest_pixel])
-    
+    setattr(sample, f"{tissue}_start_label", int(labeled_segments[closest_pixel]))
+
     return sample
 
 
@@ -326,21 +369,22 @@ def helper_print_graph_node_lengths(graph):
     for n in graph.nodes:
         print(f"Node {n}: length {graph.nodes[n].get('length', 'N/A')}")
 
-def get_long_path_in_graph_nodearea(sample: RootSample) -> RootSample:
+def get_long_path_in_graph_nodearea(sample: RootSample, tissue: str) -> RootSample:
     """Find a long path by maximizing sum of node areas along shortest paths."""
 
-    graph = sample.segment_graph
-    
+    graph = getattr(sample, f"{tissue}_segment_graph")
+    start_label = getattr(sample, f"{tissue}_start_label")
+
     # If empty graph, simply return
     if graph.number_of_nodes() == 0:
-        sample.longest_path = []
-        sample.length_pixels = 0.0
+        setattr(sample, f"{tissue}_longest_path", [])
+        setattr(sample, f"{tissue}_length_pixels", 0.0)
         return sample
 
-    # The start_label should contain the starting point closest to the shoot
-    # (this is required, because there might be a longest path not touching 
-    # the shoot), so we want to select that as starting node.
-    source_nodes = [sample.start_label] if sample.start_label in graph else list(graph.nodes)
+    # The start_label should contain the starting point closest to the anchor
+    # tissue (this is required, because there might be a longest path not
+    # touching the anchor), so we want to select that as starting node.
+    source_nodes = [start_label] if start_label in graph else list(graph.nodes)
 
     # Initialize
     longest_path = []
@@ -363,27 +407,31 @@ def get_long_path_in_graph_nodearea(sample: RootSample) -> RootSample:
     #print(f"Longest path end nodes: {[longest_path[0], longest_path[-1]]}")
 
     # Now store the longest path
-    sample.longest_path = longest_path
-    sample.length_pixels = max_length
+    setattr(sample, f"{tissue}_longest_path", longest_path)
+    setattr(sample, f"{tissue}_length_pixels", max_length)
     return sample
 
-def build_longest_path_mask(sample: RootSample) -> RootSample:
-    """Create a binary mask of the longest root path."""
+def build_longest_path_mask(sample: RootSample, tissue: str) -> RootSample:
+    """Create a binary mask of the longest path for the given tissue."""
 
-    # Create a new mask based on the labeled root mask, which only retains pixels
+    labeled_segments = getattr(sample, f"{tissue}_labeled_segments")
+    longest_path = getattr(sample, f"{tissue}_longest_path")
+
+    # Create a new mask based on the labeled mask, which only retains pixels
     # that are the longest path.
-    sample.mask_longest_root_path = \
-        np.isin(sample.labeled_segments, sample.longest_path)
-    # plt.imshow(sample.mask_longest_root_path)
+    setattr(sample, f"mask_longest_path_{tissue}",
+            np.isin(labeled_segments, longest_path))
+    # plt.imshow(getattr(sample, f"mask_longest_path_{tissue}"))
 
     return sample
 
-def get_length_longestpath(sample: RootSample) -> RootSample:
+def get_length_longestpath(sample: RootSample, tissue: str) -> RootSample:
     """Calculate the length of the longest path using the mask of that path."""
 
     # Calculate length of longest path using the mask of that path
-    sample.length_pixels = get_length_segment(sample.mask_longest_root_path)
-    
+    mask_longest_path = getattr(sample, f"mask_longest_path_{tissue}")
+    setattr(sample, f"{tissue}_length_pixels", get_length_segment(mask_longest_path))
+
     return sample
 
 ################################################################################
@@ -402,7 +450,7 @@ def return_bbox_foreground(mask):
     return (min_row, min_col, max_row, max_col)
     
 def plot_original_and_length(sample):
-    """Plot the original plant mask, and the longest branch on top"""
+    """Plot the original plant mask, and the longest root branch on top."""
     
     fig, axs = plt.subplots(1, 2)
 
@@ -414,32 +462,32 @@ def plot_original_and_length(sample):
             alpha=(sample.root_skeleton>0)*1.0)
         # plt.imshow(sample.root_mask); plt.imshow(sample.root_skeleton, cmap=ListedColormap(['none', '#cccccc']))
     # Overlay the longest path, colored in red
-    axs[0].imshow(sample.mask_longest_root_path, cmap=ListedColormap(['none', 'red']),
-              alpha=(sample.mask_longest_root_path>0)*1.0)    
+    axs[0].imshow(sample.mask_longest_path_root, cmap=ListedColormap(['none', 'red']),
+              alpha=(sample.mask_longest_path_root>0)*1.0)    
     
     # Now same but for the root
     r0, c0, r1, c1 = return_bbox_foreground(sample.root_mask)
     axs[1].imshow(sample.root_mask[r0:r1, c0:c1], cmap=ListedColormap(['black', plutils.custom_colors_plantclasses[2]]))
     axs[1].imshow(sample.root_skeleton[r0:r1, c0:c1], cmap=ListedColormap(['none', 'blue']),
                 alpha=(sample.root_skeleton[r0:r1, c0:c1] > 0) * 1.0)
-    axs[1].imshow(sample.mask_longest_root_path[r0:r1, c0:c1], cmap=ListedColormap(["none", "red"]),
-                alpha=(sample.mask_longest_root_path[r0:r1, c0:c1] > 0) * 1.0)
+    axs[1].imshow(sample.mask_longest_path_root[r0:r1, c0:c1], cmap=ListedColormap(["none", "red"]),
+                alpha=(sample.mask_longest_path_root[r0:r1, c0:c1] > 0) * 1.0)
     
     # Cosmetics
     axs[0].axis("off")
     axs[1].axis("off")
-    fig.suptitle(f"Estimated root length: {sample.length_pixels:.2f} px")
+    fig.suptitle(f"Estimated root length: {sample.root_length_pixels:.2f} px")
 
     return fig, axs
 
 def plot_distance_graph(sample):
-    """ Show the distance graph alongside the labeled segments"""
+    """ Show the distance graph alongside the labeled segments (root only)."""
     
     fig, axs = plt.subplots(1, 2, figsize=(14, 6))
     ax = axs  # keep compatibility with existing `return fig, ax`
 
     # Left panel: labeled segments, zoomed to root region only
-    labeled = sample.labeled_segments
+    labeled = sample.root_labeled_segments
     if sample.root_mask is not None and np.any(sample.root_mask > 0):
         r0, c0, r1, c1 = return_bbox_foreground(sample.root_mask)
         labeled_view = labeled[r0:r1, c0:c1]
@@ -468,12 +516,12 @@ def plot_distance_graph(sample):
     # Right panel: connectivity graph
     node_sizes = np.array(
         [
-            sample.segment_graph.nodes[n].get("length", 1)
-            for n in sample.segment_graph.nodes
+            sample.root_segment_graph.nodes[n].get("length", 1)
+            for n in sample.root_segment_graph.nodes
         ],
     )
     nx.draw(
-        sample.segment_graph,
+        sample.root_segment_graph,
         with_labels=True,
         node_color="lightblue",
         edge_color="gray",
@@ -484,7 +532,7 @@ def plot_distance_graph(sample):
     axs[1].axis("off")
     
     # suptitle with labels of longest path
-    longest_path_labels = sample.longest_path if sample.longest_path else []
+    longest_path_labels = sample.root_longest_path if sample.root_longest_path else []
     axs[1].set_title(f"Connectivity Graph\nLongest path labels: {longest_path_labels}")
     
     return fig, ax
@@ -521,7 +569,7 @@ def plot_all_plants_projected(
                                 edgecolor='red', facecolor='none')
         plt.gca().add_patch(rect)
 
-        # Project skeleton pixels back to full-image coordinates
+        # Project root skeleton pixels back to full-image coordinates
         if result.root_skeleton is not None and np.any(result.root_skeleton):
             ax.imshow(
             result.root_skeleton,
@@ -531,22 +579,37 @@ def plot_all_plants_projected(
             extent=(minc, maxc, maxr, minr),  # project ROI back to full image
             )
 
-        # Project longest-path pixels back to full-image coordinates
-        if result.mask_longest_root_path is not None and np.any(result.mask_longest_root_path):
+        # Project root longest-path pixels back to full-image coordinates
+        if result.mask_longest_path_root is not None and np.any(result.mask_longest_path_root):
             ax.imshow(
-                result.mask_longest_root_path,
+                result.mask_longest_path_root,
                 cmap=ListedColormap(["none", "red"]),
-                alpha=(result.mask_longest_root_path > 0) * 1.0,
+                alpha=(result.mask_longest_path_root > 0) * 1.0,
                 interpolation="none",
                 extent=(minc, maxc, maxr, minr),  # project ROI back to full image
             )
 
-        # Optional length label near each bbox
-        if result.length_pixels is not None:
+        # Project shoot longest-path pixels back to full-image coordinates
+        if result.mask_longest_path_shoot is not None and np.any(result.mask_longest_path_shoot):
+            ax.imshow(
+                result.mask_longest_path_shoot,
+                cmap=ListedColormap(["none", "orange"]),
+                alpha=(result.mask_longest_path_shoot > 0) * 1.0,
+                interpolation="none",
+                extent=(minc, maxc, maxr, minr),  # project ROI back to full image
+            )
+
+        # Optional length label near each bbox (root + shoot)
+        if (result.root_length_pixels is not None
+                or result.shoot_length_pixels is not None):
+            root_txt = (f"{result.root_length_pixels:.1f}"
+                        if result.root_length_pixels is not None else "n/a")
+            shoot_txt = (f"{result.shoot_length_pixels:.1f}"
+                         if result.shoot_length_pixels is not None else "n/a")
             ax.text(
             minc,
             minr - 3,
-            f"({idx}) {result.length_pixels:.1f}px",
+            f"({idx}) root {root_txt}px / shoot {shoot_txt}px",
             color=color,
             fontsize=8,
             ha="left",
@@ -563,29 +626,33 @@ def plot_all_plants_projected(
 # %% runner
 
 def run_default_length_pipeline(sample: RootSample) -> RootSample:
-    """Run the full default sequence of novice-friendly processing steps."""
-    
-    # Make binary and select largest root ROI to analyze
-    sample = ensure_binary_root_mask(sample)
-    sample = keep_largest_connected_root_component(sample)
+    """Run the full default sequence of processing steps for root AND shoot."""
 
-    # Generate a labeled skeleton to analyze
-    sample = generate_root_skeleton_no_branchpoints(sample)
-    sample = label_skeleton_segments(sample)
+    # Run the same pipeline for both tissues
+    for tissue in ("root", "shoot"):
 
-    # Build a graph, and find the longest path
-    sample = build_segment_graph(sample)
-        # plot_distance_graph(sample)
-    sample = find_start_label_close_to_shoot(sample)
-    sample = get_long_path_in_graph_nodearea(sample)
-    sample = build_longest_path_mask(sample)
-        # plot_original_and_length(sample)
-    sample = get_length_longestpath(sample)
-    
-    # Add distance in mm (if possible)
-    if sample.pixel_size_mm is not None:
-        sample.length_mm = sample.length_pixels * sample.pixel_size_mm
-    else:
-        sample.length_mm = None
+        # Make binary and select largest ROI to analyze
+        sample = ensure_binary_mask(sample, tissue)
+        sample = keep_largest_connected_component(sample, tissue)
+
+        # Generate a labeled skeleton to analyze
+        sample = generate_skeleton_no_branchpoints(sample, tissue)
+        sample = label_skeleton_segments(sample, tissue)
+
+        # Build a graph, and find the longest path
+        sample = build_segment_graph(sample, tissue)
+            # plot_distance_graph(sample)
+        sample = find_start_label_close_to_other(sample, tissue)
+        sample = get_long_path_in_graph_nodearea(sample, tissue)
+        sample = build_longest_path_mask(sample, tissue)
+            # plot_original_and_length(sample)
+        sample = get_length_longestpath(sample, tissue)
+
+        # Add distance in mm (if possible)
+        if sample.pixel_size_mm is not None:
+            setattr(sample, f"{tissue}_length_mm",
+                    getattr(sample, f"{tissue}_length_pixels") * sample.pixel_size_mm)
+        else:
+            setattr(sample, f"{tissue}_length_mm", None)
 
     return sample
