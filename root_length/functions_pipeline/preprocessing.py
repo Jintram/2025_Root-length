@@ -17,6 +17,17 @@ import root_length.functions_pipeline.utils as plutils
 
 
 ################################################################################
+# %% rect <-> mask helpers
+
+def rect_to_mask(rect, shape):
+    """Build a boolean mask of `shape` that's True inside `rect=(r0,r1,c0,c1)`."""
+    mask = np.zeros(shape, dtype=bool)
+    r0, r1, c0, c1 = rect
+    mask[r0:r1, c0:c1] = True
+    return mask
+
+
+################################################################################
 # %%
 
 def clean_mask(img_mask):

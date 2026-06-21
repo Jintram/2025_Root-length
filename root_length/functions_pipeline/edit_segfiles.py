@@ -33,6 +33,8 @@ import root_length.custom_functions.custom_mask_action as cfca
     # import importlib; importlib.reload(cfca)
 import root_length.functions_pipeline.utils as plutils
     # import importlib; importlib.reload(plutils)
+import root_length.functions_pipeline.preprocessing_seg as plprep_seg
+    # import importlib; importlib.reload(plprep_seg)
 
 import skimage.io as skio
 from skimage.draw import line
@@ -890,3 +892,88 @@ def edit_all_segfiles(df_filelist, dir_inputfiles, dir_imagefiles=None,
 
     print("========================================================")
     print("Done editing segmentation files.")
+
+
+################################################################################
+# %% compute & save plate-area rect into each segfile
+
+def compute_and_save_mask_rect_all(df_filelist, dir_inputfiles, dir_imagefiles,
+                                   overwrite=False,
+                                   margin_left=0.05, margin_right=0.05,
+                                   margin_top=0.05, margin_bottom=0.05,
+                                   min_expected_area=0.5):
+    """
+    Compute a plate-area rect per file and store it as `mask_rect` in the .npz.
+
+    Loops over `df_filelist` (as produced by `gen_metadatafile_segfiles`), loads
+    each original image, runs `preprocess_getbbox_insideplate2` to obtain a
+    rect = (minr, maxr, minc, maxc), and writes it into the matching seg .npz
+    alongside the existing arrays (e.g. `img_pred_lbls`, `prepr_info`).
+
+    The mask itself is not stored — reconstruct it via
+    `root_length.functions_pipeline.preprocessing.rect_to_mask(rect, shape)`.
+
+    Notes:
+    - If the segfile already has a `prepr_info` crop rect, the original image is
+      cropped to it first so that `mask_rect` lives in the same coordinate frame
+      as the seg arrays.
+    - Margins default to 0.05 (5% of image size); see preprocess_getbbox_insideplate2.
+    - `.npy` files are skipped (they can't hold extra keys).
+    - A one-time backup of each seg file is made via `_backup_if_needed`.
+    """
+
+    n_files = len(df_filelist)
+    for file_idx in range(n_files):
+        basedir, subdir, filename = \
+            df_filelist.loc[file_idx, ['basedir', 'subdir', 'filename']]
+        curr_file = ffl.fileinfo(basedir, subdir, filename, dir_inputfiles)
+
+        print(f"[{file_idx+1}/{n_files}] {curr_file.fullpath}")
+
+        # .npy files can't store extra keys; skip
+        if filename.endswith('.npy'):
+            print("  Skipped: .npy files can't store extra keys.")
+            continue
+
+        # Load existing arrays from the segfile
+        segfile_path = curr_file.fullpath
+        segfile_data = np.load(segfile_path, allow_pickle=True)
+        existing = {k: segfile_data[k] for k in segfile_data.files}
+
+        if (not overwrite) and ('mask_rect' in existing):
+            print("  Skipped: 'mask_rect' already present (use overwrite=True to recompute).")
+            continue
+
+        # Locate matching original image (any extension)
+        imagefile_path_noext = os.path.join(
+            dir_imagefiles, curr_file.subdir, curr_file.filebasename)
+        file_hits = glob.glob(imagefile_path_noext + ".*")
+        if len(file_hits) != 1:
+            print(f"  Skipped: expected 1 image match, found {len(file_hits)} "
+                  f"for {imagefile_path_noext}.*")
+            continue
+        img_original = skio.imread(file_hits[0])
+
+        # If seg arrays were produced on a cropped image (prepr_info present),
+        # apply that crop so mask_rect ends up in the seg coordinate frame.
+        crop_rect = existing.get('prepr_info')
+        if isinstance(crop_rect, np.ndarray) and crop_rect.ndim == 0:
+            crop_rect = crop_rect.item()
+        if crop_rect is not None:
+            minr, maxr, minc, maxc = crop_rect
+            img_original = img_original[minr:maxr, minc:maxc]
+
+        # Compute the rect
+        _, rect = plprep_seg.preprocess_getbbox_insideplate2(
+            img_original,
+            margin_left=margin_left, margin_right=margin_right,
+            margin_top=margin_top, margin_bottom=margin_bottom,
+            min_expected_area=min_expected_area)
+
+        # Save (preserve all existing keys, add/overwrite mask_rect)
+        _backup_if_needed(segfile_path)
+        existing['mask_rect'] = np.asarray(rect, dtype=np.int64)
+        np.savez_compressed(segfile_path, **existing)
+        print(f"  Saved mask_rect={tuple(int(v) for v in rect)}")
+
+    print("Done computing mask_rect for all segfiles.")

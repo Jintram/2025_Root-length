@@ -101,6 +101,15 @@ def preprocess_getbbox_insideplate2(img_in_raw, margin_left = 100, margin_right 
                                          margin_top = 250, margin_bottom = 250,
                                          min_expected_area = 500000):
     """
+    returns recteangle coordinates based on an original image, 
+    that can be used for cropping or masking.
+    
+    this function uses the 50th percentile for an initial mask, assuming
+    the edges of the plate have higher-than-average intensities, 
+    to identify a mask outline.
+    NOTE, TO DO:
+    this is not very elegant, and a bit ad-hoc, can be improved upon.
+    
     margins can be given as fraction of image size, or in pixels.
     numbers >0 and <1 will be considered fractions.
     
@@ -119,6 +128,8 @@ def preprocess_getbbox_insideplate2(img_in_raw, margin_left = 100, margin_right 
         margin_top = int(img_in_raw.shape[0] * margin_top)
     if (margin_bottom > 0) and (margin_bottom <1):
         margin_bottom = int(img_in_raw.shape[0] * margin_bottom)
+    if (min_expected_area > 0) and (min_expected_area <1):
+        min_expected_area = int(img_in_raw.shape[0] * img_in_raw.shape[1] * min_expected_area)
     
     # convert to greyscale
     img_in_gray = rgb2gray(img_in_raw)

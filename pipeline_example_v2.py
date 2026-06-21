@@ -54,6 +54,19 @@ pledit.edit_all_segfiles(df_filelist=df_filelist,
 # mytest.keys()
 
 ################################################################################
+# %% Compute plate-area rect per file and store as `mask_rect` in each segfile.
+# Reconstruct the mask later via preprocessing.rect_to_mask(rect, shape).
+
+# TO DO: option to clear areas outside the mask,
+# TEST parameter that only touches the first X files
+
+pledit.compute_and_save_mask_rect_all(
+    df_filelist=df_filelist,
+    dir_inputfiles=DIR_INPUTFILES,
+    dir_imagefiles=DIR_IMAGEFILES,
+)
+
+################################################################################
 # %% Run the analysis
 plap.analyze_all_plates(df_filelist=df_filelist,
                         output_dir=DIR_OUTPUTFILES)
