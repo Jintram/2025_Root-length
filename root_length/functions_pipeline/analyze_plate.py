@@ -76,21 +76,30 @@ def analyze_plate(curr_file):
     # %matplotlib qt
     # plprep.plot_mask_and_bboxes(labeled_mask=img_mask_clean,the_rprops=img_mask_rprops[sel_plants],curr_file=curr_file)
 
-    # Build RootSample objects for each QC-passed plant
+    # Build PlantSample objects for each QC-passed plant
     current_sample_all_plants = []
     for idx, plant_mask in enumerate(list_img_indivplants[sel_plants]):
-        
+
         root_mask = plant_mask == 2
         shoot_mask = plant_mask == 1
         original_bbox = \
             np.array(img_mask_rprops)[sel_plants][idx].bbox
-        
+
+        root_tissue = pllen.TissueSample(
+            mask=root_mask,
+            anchor_mask=shoot_mask,
+        )
+        shoot_tissue = pllen.TissueSample(
+            mask=shoot_mask,
+            anchor_mask=root_mask,
+        )
+
         current_sample_all_plants.append(
-            pllen.RootSample(
-                root_mask=root_mask,
-                shoot_mask=shoot_mask,
+            pllen.PlantSample(
+                root=root_tissue,
+                shoot=shoot_tissue,
                 plant_mask=plant_mask,
-                bbox=original_bbox
+                bbox=original_bbox,
             )
         )
         
@@ -129,10 +138,10 @@ def analyze_plate(curr_file):
         "sample_identifier": curr_file.filebasename,
         "subdir": curr_file.subdir,
         "plant_index": np.arange(len(current_sample_all_plants)),
-        "root_length_pixels": [plant.root_length_pixels for plant in current_sample_all_plants],
-        "root_length_mm": [plant.root_length_mm for plant in current_sample_all_plants],
-        "shoot_length_pixels": [plant.shoot_length_pixels for plant in current_sample_all_plants],
-        "shoot_length_mm": [plant.shoot_length_mm for plant in current_sample_all_plants]
+        "root_length_pixels": [plant.root.length_pixels for plant in current_sample_all_plants],
+        "root_length_mm": [plant.root.length_mm for plant in current_sample_all_plants],
+        "shoot_length_pixels": [plant.shoot.length_pixels for plant in current_sample_all_plants],
+        "shoot_length_mm": [plant.shoot.length_mm for plant in current_sample_all_plants]
     })
     output_filename = curr_file.filebasename + "_lengths.tsv"
     df_out.to_csv(
