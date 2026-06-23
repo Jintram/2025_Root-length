@@ -56,7 +56,7 @@ def identify_plants(img_mask_clean):
 
 # %%
 
-def analyze_plate(curr_file):
+def analyze_plate(curr_file, config_pipeline):
     # segfile_path = "/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/SEGMENTATION/202602/segfiles/20250520/20250520_OY03.npz"
 
     # Load input
@@ -111,7 +111,10 @@ def analyze_plate(curr_file):
         
         # Perform calculations based on this plant mask
         # and store the result in the same "plant container"
-        current_sample_all_plants[i] = pllen.run_default_length_pipeline(sample)
+        current_sample_all_plants[i] = \
+            pllen.run_default_length_pipeline(
+                sample, 
+                config_pipeline=config_pipeline)
         
         if current_sample_all_plants[i] is None:
             print("^ FAILED")
@@ -151,7 +154,10 @@ def analyze_plate(curr_file):
         
 # %% runners
 
-def analyze_all_plates(df_filelist, output_dir):
+def analyze_all_plates(df_filelist, output_dir, config_pipeline=None):
+    
+    if config_pipeline is None:
+        config_pipeline = pllen.ConfigPipeline()
 
     time_taken = []
     for file_idx in range(len(df_filelist)):
@@ -170,7 +176,7 @@ def analyze_all_plates(df_filelist, output_dir):
         print(f"Processing file {file_idx+1}/{len(df_filelist)}: {curr_file.fullpath}")
         
         # Analyze the plate
-        analyze_plate(curr_file)
+        analyze_plate(curr_file, config_pipeline=config_pipeline)
         
         # record end time
         end_time = time.time(); time_taken.append(end_time - start_time)

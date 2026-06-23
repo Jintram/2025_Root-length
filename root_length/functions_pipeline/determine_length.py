@@ -66,7 +66,10 @@ class TissueSample:
 
     length_pixels: float | None = None
     length_mm: float | None = None
-
+    
+@dataclass
+class ConfigPipeline:
+    smoothing_diskradius: int | None = None
 
 @dataclass
 class PlantSample:
@@ -126,6 +129,15 @@ def keep_largest_connected_component(sample: TissueSample) -> TissueSample:
     sample.clean_mask = (labeled == largest_region.label)
         # plt.imshow(sample.clean_mask)
 
+    return sample
+
+def apply_smoothing(sample, config_pipeline):
+    """ Smooths mask to avoid spurious branching. """
+    
+    footprint = morphology.disk(config_pipeline.smoothing_diskradius)
+    sample.clean_mask = morphology.closing(sample.clean_mask,
+                                           footprint=footprint)
+                                           
     return sample
 
 ################################################################################
@@ -587,9 +599,9 @@ def plot_all_plants_projected(
             ax.text(
             minc,
             minr - 3,
-            f"({idx}) root {root_txt}px / shoot {shoot_txt}px",
+            f"({idx}) root {root_txt}px\nshoot {shoot_txt}px",
             color=color,
-            fontsize=8,
+            fontsize=5,
             ha="left",
             va="bottom",
             bbox=dict(facecolor="black", alpha=0.35, edgecolor="none", pad=1),
@@ -603,12 +615,17 @@ def plot_all_plants_projected(
 
 # %% runner
 
-def run_tissue_pipeline(sample: TissueSample) -> TissueSample:
+def run_tissue_pipeline(sample: TissueSample,
+                        config_pipeline: ConfigPipeline) -> TissueSample:
     """Run the full default sequence of processing steps for one tissue."""
 
     # Make binary and select largest ROI to analyze
     sample = ensure_binary_mask(sample)
     sample = keep_largest_connected_component(sample)
+
+    # smooth (morphological closing) the mask if desired
+    if config_pipeline.smoothing_diskradius is not None:
+        sample = apply_smoothing(sample, config_pipeline)
 
     # Generate a labeled skeleton to analyze
     sample = generate_skeleton_no_branchpoints(sample)
@@ -626,12 +643,13 @@ def run_tissue_pipeline(sample: TissueSample) -> TissueSample:
     return sample
 
 
-def run_default_length_pipeline(plant: PlantSample) -> PlantSample:
+def run_default_length_pipeline(plant: PlantSample,
+                                config_pipeline: ConfigPipeline) -> PlantSample:
     """Run the per-tissue pipeline for both root and shoot of one plant."""
 
     # Process each tissue independently
-    plant.root = run_tissue_pipeline(plant.root)
-    plant.shoot = run_tissue_pipeline(plant.shoot)
+    plant.root = run_tissue_pipeline(plant.root, config_pipeline)
+    plant.shoot = run_tissue_pipeline(plant.shoot, config_pipeline)
 
     # Add distance in mm (if pixel size is known)
     if plant.pixel_size_mm is not None:

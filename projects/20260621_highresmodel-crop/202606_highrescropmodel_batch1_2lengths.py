@@ -17,6 +17,7 @@ import root_length.functions_pipeline.edit_segfiles as pledit
 # dataset spcecific config
 DIR_INPUTFILES = '/Users/m.wehrens/Data_notbacked/2025_hypocotyl_images/SEG_2026_highresmodel-crop/segfiles/'
 DIR_OUTPUTFILES = '/Users/m.wehrens/Data_notbacked/2025_hypocotyl_images/LEN_2026_highresmodel-crop/'
+    # DIR_OUTPUTFILES = '/Users/m.wehrens/Data_notbacked/2025_hypocotyl_images/LEN_2026_highresmodel-crop-test/'
 DIR_IMAGEFILES = '/Users/m.wehrens/Data_notbacked/2025_hypocotyl_images/DATA/'
 
 # DIR_INPUTFILES = '/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/SELECTION_ML/model_seg/segfiles/'
@@ -73,14 +74,29 @@ pledit.edit_all_segfiles(df_filelist=df_filelist,
 
 ################################################################################
 # %% Run the analysis
+# import importlib; importlib.reload(plap)
+
+
+from root_length.functions_pipeline.determine_length import ConfigPipeline
+
+# Set configuration parameters
+config_pipeline = \
+    ConfigPipeline(
+        # Smooths the root/shoots to avoid spurious branching
+        smoothing_diskradius=5
+        )
 
 # test run
 plap.analyze_all_plates(df_filelist=df_filelist[:10],
-                        output_dir=DIR_OUTPUTFILES)
+                        output_dir=DIR_OUTPUTFILES, 
+                        config_pipeline=config_pipeline)
+
+
 
 # full run
 plap.analyze_all_plates(df_filelist=df_filelist,
-                        output_dir=DIR_OUTPUTFILES)
+                        output_dir=DIR_OUTPUTFILES,
+                        config_pipeline=config_pipeline)
 
 # Now make one big overview dataframe
 plap.generate_df_all(df_filelist, DIR_OUTPUTFILES)

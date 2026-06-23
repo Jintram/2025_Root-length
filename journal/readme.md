@@ -9,7 +9,7 @@ First run the segmentation pipeline using the new model.
 
 #### Things to do
 
-- The current pre-processing is inconvenient, as there is a specific function
+- [ ] The current pre-processing is inconvenient, as there is a specific function
 being fed that pre-processes the image for cropping, and the cropped image
 won't be saved.
      - Allthough this takes more space, it might be better to first segment
@@ -18,13 +18,13 @@ won't be saved.
      cleared.
      
      
-- Perhaps a function that allows 'automatic' updating of root/shoot boundary,
+- [ ] Perhaps a function that allows 'automatic' updating of root/shoot boundary,
 bound in napari, where all "shoot" annotation that falls below the highest
 "root" annotation, is automatically converted to root, would be highly
 useful.
 
 
-- Many images are quite well segmented, but many are also more poorly segmented.
+- [ ] Many images are quite well segmented, but many are also more poorly segmented.
 In some cases, the previous model was even better at identifying the roots/shoots,
 even for the higher resolution cases.
     - A reason for this might be that I've now included more background, ie
@@ -45,3 +45,13 @@ even for the higher resolution cases.
         
 - additionally, currently, we used two separate training sets for the model;
 these two training sets could be combined.
+
+## 2026-06-23
+
+- [ ] Combining root & shoot skeletons
+    - Currently, root and shoot are analyzed independently. This causes
+    the "length line" to be often not connected between the root and shoot.
+    This could be avoided by calculating the skeleton for both the root and shoot
+    area at once (assuming they are connected -- allthough might work
+    if they aren't), and then select skeleton based on the respective root and
+    shoot-masks for root and shoot specific skeletons.
