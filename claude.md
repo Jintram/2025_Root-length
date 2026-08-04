@@ -22,7 +22,7 @@ important ones are root and shoot length.
 ## Repository layout
 
 
-- [root_length](root_length/) contains installable python package
+- [root_length/](root_length/) contains installable python package
     - [functions_files/filelisting.py](root_length/functions_files/filelisting.py) provides functionality to 
     read the directory structure into a dataframe.
     - [edit_segfiles](root_length/functions_pipeline/edit_segfiles.py) the function `edit_all_segfiles` and 
