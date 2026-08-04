@@ -60,5 +60,7 @@ these two training sets could be combined.
 
 - [ ] See previous entry
 
+- [X] Test 123..
 
-- Current test case: XXX
+- Current test case: 
+    - projects/20260621_highresmodel-crop/202606_highrescropmodel_batch1_2lengths.py
