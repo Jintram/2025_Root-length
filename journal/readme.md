@@ -55,12 +55,20 @@ these two training sets could be combined.
     area at once (assuming they are connected -- allthough might work
     if they aren't), and then select skeleton based on the respective root and
     shoot-masks for root and shoot specific skeletons.
+        - Challenge: how to deal with when there's a seed that isolates the two
+        separate regions?
+            - perhaps using a strong closing on the selected regions does the trick, see "misc/dealing_holes.py".
     
 ## 2026-08-04
 
-- [ ] See previous entry
+- [ ] See previous entries
+    - (better skeleton at boundaries)
+    - (cropping)
 
-- [X] Test 123..
+##### Optional features later;
 
-- Current test case: 
-    - projects/20260621_highresmodel-crop/202606_highrescropmodel_batch1_2lengths.py
+- [ ] Show the crop-recteangle in the Napari viewer (and allow it to be edited)
+
+##### Current test case: 
+
+- projects/20260621_highresmodel-crop/202606_highrescropmodel_batch1_2lengths.py
