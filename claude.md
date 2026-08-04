@@ -133,4 +133,4 @@ stored parameter `prepr_info` in the segfile contains the cropping information.
 
 ## Pointers for deeper context
 
-- Beginning of documentation (needs further editing from human programmer): [/README.md](/README.md)
+- Beginning of documentation (needs further editing from human programmer): [README.md](README.md)
