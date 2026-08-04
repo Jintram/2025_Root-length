@@ -102,7 +102,7 @@ This repo runs in `cheeky-all` conda env, ie `conda activate cheeky-all`.
 - If changes are made, claude.md can be updated accordingly.
 - Coding style;
     - Code should be relatively offensive (no tests, extensive docstrings). 
-    - Code should be modular, but rather a two liner than extensive function definitions.
+    - Code should be modular, but rather a two liner than many function definitions.
     - Generally, code is organized in topical blocks, headed by explanatory comment 
     focussed on the why and what, not the how.
     - Do not add type hints, docstrings, or comments to existing code that does not
@@ -133,4 +133,4 @@ stored parameter `prepr_info` in the segfile contains the cropping information.
 
 ## Pointers for deeper context
 
-- Beginning of documentation (needs further editing from human programmer): [readme.md](readme.md)
+- Beginning of documentation (needs further editing from human programmer): [/readme.md](/readme.md)
