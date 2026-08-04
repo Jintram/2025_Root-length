@@ -55,3 +55,10 @@ these two training sets could be combined.
     area at once (assuming they are connected -- allthough might work
     if they aren't), and then select skeleton based on the respective root and
     shoot-masks for root and shoot specific skeletons.
+    
+## 2026-08-04
+
+- [ ] See previous entry
+
+
+- Current test case: XXX
