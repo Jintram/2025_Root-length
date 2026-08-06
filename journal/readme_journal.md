@@ -65,6 +65,21 @@ these two training sets could be combined.
     - (better skeleton at boundaries)
     - (cropping)
 
+**TO DO NOW:**
+- [ ] Implement way to combine multiple labels and distill separate skeletons 
+afterwards.
+    - Keep closing operation in mind.
+    
+##### Notes regarding root/shoot joined area analysis
+
+*I currently have a pipeline where root and shoot masks are determined from the labeled mask per plant, and the length is determined based on the skeleton of either root or shoot, without sharing knowledge between the two masks. I'd like to change this as follows;
+the root and shoot mask should be combined, such and a shared skeleton should be determined. then, to determine the root and shoot specific skeletons, the relevant (root/shoot) mask is simply applied to the skeleton.*
+
+- Add a "fix_holes()" function
+- Would easiest solution not simply be to create a joined mask and store that
+in the tissue class?
+- things to check: how is longest length restricted to 
+
 ##### Optional features later;
 
 - [ ] Show the crop-recteangle in the Napari viewer (and allow it to be edited)
