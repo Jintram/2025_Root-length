@@ -100,7 +100,7 @@ afterwards.
         - See journal/refactor_20260806_sharedskeleton-holes_issues.md, which explains a case where it goes wrong.
         - When there are multi-area roots or shoots, the longest stretch is taken (this requires root and shoots to be intermingled, doesn't occur with "seed blockade"), instead of summing the lengths.
     - Keep closing operation in mind.
-- [ ] Go over test sample and make description of what happens
+- [ ] Go over test sample and make description of what happens for documentation
     
 ##### Notes regarding root/shoot joined area analysis
 
