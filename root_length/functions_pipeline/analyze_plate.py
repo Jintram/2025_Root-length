@@ -82,6 +82,7 @@ def analyze_plate(curr_file, config_pipeline):
 
         root_mask = plant_mask == 2
         shoot_mask = plant_mask == 1
+        
         original_bbox = \
             np.array(img_mask_rprops)[sel_plants][idx].bbox
 
@@ -105,6 +106,7 @@ def analyze_plate(curr_file, config_pipeline):
         
     # Now process all plants
     for i, sample in enumerate(current_sample_all_plants):
+        # i = 1; sample=current_sample_all_plants[i]
         # i = 14; sample=current_sample_all_plants[i]
         
         print(f"Currently processing plant {i+1} of {len(current_sample_all_plants)}")
@@ -113,7 +115,7 @@ def analyze_plate(curr_file, config_pipeline):
         # and store the result in the same "plant container"
         current_sample_all_plants[i] = \
             pllen.run_default_length_pipeline(
-                sample, 
+                plant = sample, 
                 config_pipeline=config_pipeline)
         
         if current_sample_all_plants[i] is None:
@@ -148,7 +150,7 @@ def analyze_plate(curr_file, config_pipeline):
         # QC: which plants needed their mask bridged, and which fell back to
         # analyzing root and shoot separately
         "dilation_radius_used": [plant.dilation_radius_used for plant in current_sample_all_plants],
-        "used_fallback": [plant.used_fallback for plant in current_sample_all_plants],
+        "nosharedskeleton_flag": [plant.nosharedskeleton_flag for plant in current_sample_all_plants],
         # QC: a tissue skeleton falling apart in multiple parts means only one
         # of those parts got measured (happens when root and shoot overlap)
         "root_skeleton_parts": [len(plant.root.start_labels) for plant in current_sample_all_plants],
@@ -169,6 +171,7 @@ def analyze_all_plates(df_filelist, output_dir, config_pipeline=None):
 
     time_taken = []
     for file_idx in range(len(df_filelist)):
+        # file_idx = 1
         # file_idx = 37
         # file_idx = 462
         

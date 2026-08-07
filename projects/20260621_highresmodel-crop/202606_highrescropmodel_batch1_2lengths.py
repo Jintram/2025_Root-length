@@ -78,6 +78,7 @@ pledit.edit_all_segfiles(df_filelist=df_filelist,
 
 
 from root_length.functions_pipeline.determine_length import ConfigPipeline
+    # import importlib; importlib.reload(ConfigPipeline)
 
 # Set configuration parameters
 config_pipeline = \

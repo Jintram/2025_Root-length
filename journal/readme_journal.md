@@ -66,6 +66,22 @@ these two training sets could be combined.
     - (cropping)
 
 **TO DO NOW:**
+
+** CONTINUE HERE **
+
+- [ ] THINGS SEEM TO HAVE WORKED, BUT FOR 
+/Users/m.wehrens/Data_notbacked/2025_hypocotyl_images/LEN_2026_highresmodel-crop/lenplots/tif/high_res/20250611/20250614_OY_05_all-plants-projected.pdf
+THE MERGING OF THE TWO REGIONS DIDN'T WORK, DESPITE THE FACT THAT A RADIUS OF 10
+SHOULD BE SUFFICIENT.
+GO OVER THE PIPELINE, FOCUSSING ON THIS SAMPLE .. (SHOULD BE IN THE FIRST 10
+OF THE SELECTION, SEE 
+```
+plap.analyze_all_plates(df_filelist=df_filelist[:10]
+```
+IN projects/20260621_highresmodel-crop/202606_highrescropmodel_batch1_2lengths.py
+
+** END CONTINUE HERE **
+
 - [ ] Implement way to combine multiple labels and distill separate skeletons 
 afterwards.
     - [X] Use Claude Code to implement changes.
@@ -84,6 +100,7 @@ afterwards.
         - See journal/refactor_20260806_sharedskeleton-holes_issues.md, which explains a case where it goes wrong.
         - When there are multi-area roots or shoots, the longest stretch is taken (this requires root and shoots to be intermingled, doesn't occur with "seed blockade"), instead of summing the lengths.
     - Keep closing operation in mind.
+- [ ] Go over test sample and make description of what happens
     
 ##### Notes regarding root/shoot joined area analysis
 
