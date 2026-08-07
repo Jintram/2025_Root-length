@@ -68,6 +68,21 @@ these two training sets could be combined.
 **TO DO NOW:**
 - [ ] Implement way to combine multiple labels and distill separate skeletons 
 afterwards.
+    - [X] Use Claude Code to implement changes.
+        - Description by Claude Opus 5: 
+        *Root and shoot are no longer skeletonized separately (which distorted both centerlines at
+        their shared border); instead they are merged into one binary mask, skeletonized once, and
+        the skeleton is split again by assigning each pixel to the nearest tissue. Holes in that mask
+        (e.g. a seed interrupting the root) are bridged beforehand by dilating with the smallest
+        radius that makes the mask whole, capped by ConfigPipeline.dilation_radius_maximum; plants
+        exceeding the cap fall back to the old per-tissue treatment. Over 131 test plants the net
+        effect was centered on zero (root: mean -2.4 px, median 0) with 25 plants bridged, and
+        ConfigPipeline(shared_skeleton=False) reproduces the previous output exactly.*
+        - NOTE: assess myself what happens if this procedure result in multiple skeletons (because there are multiple root or shoot areas).
+    - [ ] Test the code.
+    - [ ] Double check open issues
+        - See journal/refactor_20260806_sharedskeleton-holes_issues.md, which explains a case where it goes wrong.
+        - When there are multi-area roots or shoots, the longest stretch is taken (this requires root and shoots to be intermingled, doesn't occur with "seed blockade"), instead of summing the lengths.
     - Keep closing operation in mind.
     
 ##### Notes regarding root/shoot joined area analysis
@@ -78,7 +93,7 @@ the root and shoot mask should be combined, such and a shared skeleton should be
 - Add a "fix_holes()" function
 - Would easiest solution not simply be to create a joined mask and store that
 in the tissue class?
-- things to check: how is longest length restricted to 
+- things to check: how is longest skeleton length restricted to path that touches root/shoot boundary?
 
 ##### Optional features later;
 
@@ -87,3 +102,10 @@ in the tissue class?
 ##### Current test case: 
 
 - projects/20260621_highresmodel-crop/202606_highrescropmodel_batch1_2lengths.py
+
+## Open nice-to-address issues
+
+- [ ] some functions have a hard-coded label for roots/shoots (ie `== 1`, or 
+  `== 2`) (and also of course `root_tissue` or `shoot_tissue` restrict
+  the analysis to only root-shoot analysis). This occurs e.g. in `analyze_plate()`
+  and `assign_nearest_tissue()`. Should this be made more general?

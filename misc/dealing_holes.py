@@ -92,6 +92,15 @@ img_test_dila_skel = morphology.skeletonize(img_test_dilated2)
 plt.imshow(img_test_dila_skel+img_test_pad)
 
 
+# get skeleton of dilation + erosion (L-1) mask
+# NOTE: THIS DOESN'T WORK -- because the "bridge" can still contain
+# rather small neck parts
+img_test_dilaero2 = erosion(img_test_dilated2, disk(closing_distance/2+3))
+plt.imshow(img_test_dilaero2)
+img_test_dilaero2_skel = morphology.skeletonize(img_test_dilaero2)
+plt.imshow(img_test_dilaero2_skel+img_test_pad)
+
+
 
 # Note: 
 # It will be required to assign regions outside the original mask a root

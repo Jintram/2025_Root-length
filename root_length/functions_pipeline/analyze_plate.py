@@ -144,7 +144,15 @@ def analyze_plate(curr_file, config_pipeline):
         "root_length_pixels": [plant.root.length_pixels for plant in current_sample_all_plants],
         "root_length_mm": [plant.root.length_mm for plant in current_sample_all_plants],
         "shoot_length_pixels": [plant.shoot.length_pixels for plant in current_sample_all_plants],
-        "shoot_length_mm": [plant.shoot.length_mm for plant in current_sample_all_plants]
+        "shoot_length_mm": [plant.shoot.length_mm for plant in current_sample_all_plants],
+        # QC: which plants needed their mask bridged, and which fell back to
+        # analyzing root and shoot separately
+        "dilation_radius_used": [plant.dilation_radius_used for plant in current_sample_all_plants],
+        "used_fallback": [plant.used_fallback for plant in current_sample_all_plants],
+        # QC: a tissue skeleton falling apart in multiple parts means only one
+        # of those parts got measured (happens when root and shoot overlap)
+        "root_skeleton_parts": [len(plant.root.start_labels) for plant in current_sample_all_plants],
+        "shoot_skeleton_parts": [len(plant.shoot.start_labels) for plant in current_sample_all_plants]
     })
     output_filename = curr_file.filebasename + "_lengths.tsv"
     df_out.to_csv(

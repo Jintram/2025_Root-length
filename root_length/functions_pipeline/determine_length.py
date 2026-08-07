@@ -17,6 +17,7 @@ from typing import Callable, Iterable
 
 import networkx as nx
 import numpy as np
+from scipy import ndimage
 from scipy.ndimage import convolve, distance_transform_edt
 from skimage import morphology
 from skimage.measure import label, regionprops
@@ -60,7 +61,7 @@ class TissueSample:
     labeled_segments: np.ndarray | None = None
     segment_graph: nx.Graph | None = None
 
-    start_label: int | None = None
+    start_labels: list[int] | None = None
     longest_path: list[int] | None = None
     mask_longest_path: np.ndarray | None = None
 
@@ -70,6 +71,10 @@ class TissueSample:
 @dataclass
 class ConfigPipeline:
     smoothing_diskradius: int | None = None
+    # derive root and shoot centerlines from one shared skeleton
+    shared_skeleton: bool = True
+    # largest dilation radius allowed to bridge holes in the root+shoot mask
+    dilation_radius_maximum: int = 10
 
 @dataclass
 class PlantSample:
@@ -81,6 +86,12 @@ class PlantSample:
     pixel_size_mm: float | None = None
     # position of the bbox in the original image
     bbox: tuple[int, int, int, int] | None = None
+
+    # the root+shoot mask, if the two are analyzed as one object
+    combined: TissueSample | None = None
+    # administration of decisions taken:
+    dilation_radius_used: int | None = None
+    used_fallback: bool | None = None
 
 
 ################################################################################
@@ -137,17 +148,204 @@ def apply_smoothing(sample, config_pipeline):
     footprint = morphology.disk(config_pipeline.smoothing_diskradius)
     sample.clean_mask = morphology.closing(sample.clean_mask,
                                            footprint=footprint)
-                                           
+
     return sample
+
+################################################################################
+# %% Shared skeleton for root and shoot
+
+# Skeletonizing root and shoot separately distorts both centerlines at the
+# border between them, because the medial axis of a truncated shape retracts
+# from the cut. The functions below instead treat root+shoot as one object,
+# skeletonize that once, and divide the result again afterwards.
+
+def region_distances(mask):
+    """
+    Find inter-island distances.
+
+    Label connected components ("islands"), then for each one find the min
+    distance to the nearest pixel belonging to any *other* component. Returns
+    an empty array when there is nothing to bridge (mask is already whole).
+    """
+
+    # Label, using the same 8-connectivity as the rest of the pipeline
+    labels, n_labels = label(mask, return_num=True)
+
+    # A whole (or empty) mask has no gaps to report
+    if n_labels <= 1:
+        return np.array([], dtype=float)
+
+    # Loop over each "island"
+    distances = []
+    for island_idx in range(1, n_labels + 1):
+
+        # create mask for other "islands"
+        mask_others = (labels > 0) & (labels != island_idx)
+
+        # get distances to closest for each pixel in the island
+        current_distances = distance_transform_edt(~mask_others)
+        # now select and save the smallest for island i
+        distances.append(current_distances[labels == island_idx].min())
+
+    return np.array(distances)
+
+
+def dilate_to_connect(mask, config_pipeline):
+    """
+    Dilate a mask just enough to merge its separate parts into one region.
+
+    Holes in a mask (e.g. a seed interrupting the root) split it in two, which
+    would fragment the skeleton. Two regions separated by a gap g merge once
+    both are dilated by g/2. The surplus material added by the
+    dilation is dealt with by `prune_skeleton_outside_mask` later on.
+
+    The radius is kept as small as possible, because dilation distorts: bends
+    tighter than the radius get straightened out, and structures passing within
+    twice the radius of each other get fused. `dilation_radius_maximum` limits
+    that damage; beyond it the gap is left alone and (None) is returned as
+    radius, signalling the caller to fall back to per-tissue processing.
+    """
+
+    # Determine gaps between the separate parts, if any
+    distances = region_distances(mask)
+    if distances.size == 0:
+        return mask, 0
+
+    # Half the largest gap suffices, +1 as margin for the discrete disk
+    radius = int(np.ceil(distances.max() / 2)) + 1
+
+    # abort if radius too large
+    if radius > config_pipeline.dilation_radius_maximum:
+        return mask, None
+
+    # perform dilation
+    mask_dilated = morphology.binary_dilation(mask, morphology.disk(radius))
+
+    # Give up if this didn't actually result in one single region
+    if label(mask_dilated, return_num=True)[1] >1:
+        return mask, None
+
+    return mask_dilated, radius
+
+
+def prune_skeleton_outside_mask(skeleton, mask):
+    """
+    Strip skeleton branch ends that stick out of `mask`.
+
+    Dilating before skeletonizing also extends the free ends of the object (the
+    root tip, the shoot apex) by the dilation radius, which would inflate the
+    measured length. Repeatedly removing end points that lie outside the
+    original mask undoes that. Bridges over holes survive, since they run
+    between two parts of the mask and hence never end in a free end.
+    """
+
+    skeleton = skeleton.copy()
+    while True:
+
+        # End points have one neighbor at most (isolated pixels have none)
+        # count number of connections of each pixel
+        neighbor_counts = convolve(skeleton.astype(int), KERNEL_NEIGHBOR_COUNT,
+                                   mode="constant", cval=0)
+        # remove loose ends (<= neighbor) outside original mask
+        pixels_to_remove = skeleton & (neighbor_counts <= 1) & ~mask
+
+        # Done once all remaining end points lie inside the mask
+        if not pixels_to_remove.any():
+            return skeleton
+
+        skeleton = skeleton & ~pixels_to_remove
+
+
+def assign_nearest_tissue(root_mask, shoot_mask):
+    """
+    Label every pixel by the tissue it lies closest to.
+
+    Dilation adds pixels that belong to neither original mask, and
+    other tissues (a seed, typically) can sit in between the two. Handing those
+    pixels to the nearest tissue divides the image cleanly in two, so the shared
+    skeleton can be split up without losing pixels in between.
+    """
+
+    # 2 = root, 1 = shoot, following the labels used in the plant masks
+    tissue_ids = np.where(root_mask, 2, np.where(shoot_mask, 1, 0))
+
+    # For each pixel, look up the identity of the nearest labeled pixel
+    _, (rows_nearest, cols_nearest) = \
+        distance_transform_edt(tissue_ids == 0, return_indices=True)
+
+    return tissue_ids[rows_nearest, cols_nearest]
+
+
+def prepare_shared_skeleton(plant: PlantSample,
+                            config_pipeline: ConfigPipeline) -> PlantSample:
+    """
+    Skeletonize the root+shoot mask as a whole, and split the result per tissue.
+
+    Sets `skeleton` (plus `clean_mask` and `anchor_mask`) on both tissues, which
+    makes `run_tissue_pipeline` skip its own skeletonization. If the mask cannot
+    be made whole, nothing is set and `used_fallback` is raised instead, so that
+    each tissue simply gets processed on its own as before.
+    """
+
+    # Root and shoot are analyzed as one object
+    mask_combined = plant.root.mask.astype(bool) | plant.shoot.mask.astype(bool)
+    plant.combined = TissueSample(mask=mask_combined)
+
+    # Work on a padded copy, as the plant touches the edges of its bounding box
+    # and both the closing and the dilation need room around it
+    pad = config_pipeline.dilation_radius_maximum
+    plant.combined.clean_mask = np.pad(mask_combined, pad)
+
+    # smooth (morphological closing) the mask if desired
+    if config_pipeline.smoothing_diskradius is not None:
+        plant.combined = apply_smoothing(plant.combined, config_pipeline)
+
+    # Bridge holes that would otherwise fragment the skeleton
+    plant.combined.clean_mask, plant.dilation_radius_used = \
+        dilate_to_connect(plant.combined.clean_mask, config_pipeline)
+
+    # Bail out if the mask couldn't be made whole
+    plant.used_fallback = plant.dilation_radius_used is None
+    if plant.used_fallback:
+        return plant
+
+    # Skeletonize the whole object, then undo the padding
+    skeleton = morphology.skeletonize(plant.combined.clean_mask)
+    n_rows, n_cols = mask_combined.shape
+    plant.combined.clean_mask = \
+        plant.combined.clean_mask[pad:pad+n_rows, pad:pad+n_cols]
+    skeleton = skeleton[pad:pad+n_rows, pad:pad+n_cols]
+
+    # Remove the spurs that the dilation grew at the free ends
+    plant.combined.skeleton = prune_skeleton_outside_mask(skeleton, mask_combined)
+        # plt.imshow(plant.combined.skeleton + plant.combined.mask)
+
+    # Now divide the shared skeleton over the two tissues
+    nearest_tissue = assign_nearest_tissue(plant.root.mask, plant.shoot.mask)
+    for tissue, tissue_id in ((plant.root, 2), (plant.shoot, 1)):
+        tissue.clean_mask = plant.combined.clean_mask & (nearest_tissue == tissue_id)
+        tissue.skeleton = plant.combined.skeleton & (nearest_tissue == tissue_id)
+
+    # Anchor each tissue to the other one's skeleton, such that the longest
+    # path is made to start at the root/shoot junction
+    plant.root.anchor_mask = plant.shoot.skeleton
+    plant.shoot.anchor_mask = plant.root.skeleton
+
+    return plant
 
 ################################################################################
 # %% Branch analysis
 
-def generate_skeleton_no_branchpoints(sample: TissueSample) -> TissueSample:
-    """Skeletonize `sample.clean_mask` and remove branch-point pixels."""
+def generate_skeleton(sample: TissueSample) -> TissueSample:
+    """Skeletonize `sample.clean_mask`."""
 
-    # Obtain the skeleton
     sample.skeleton = morphology.skeletonize(sample.clean_mask)
+
+    return sample
+
+
+def analyze_skeleton_branchpoints(sample: TissueSample) -> TissueSample:
+    """Remove branch-point pixels from `sample.skeleton`, and locate the nodes."""
 
     # Create an equal-sized array that gives the neighbor count for each pixel
     # in the skeleton.
@@ -333,13 +531,22 @@ def build_segment_graph(sample: TissueSample) -> TissueSample:
     return sample
 
 
-def find_start_label_close_to_anchor(sample: TissueSample) -> TissueSample:
+def find_start_labels_close_to_anchor(sample: TissueSample) -> TissueSample:
     """
-    Pick the segment label nearest to `sample.anchor_mask`.
+    Per connected part of the skeleton, pick the segment nearest `anchor_mask`.
 
-    The anchor is typically the *other* tissue's mask (root anchors to shoot,
-    shoot anchors to root). If `anchor_mask` is None, the step is skipped
-    and `get_long_path_in_graph_nodearea` will fall back to using any node.
+    The anchor is typically the *other* tissue (root anchors to shoot, shoot
+    anchors to root), so these labels sit at the root/shoot junction, which is
+    where the longest path should start.
+
+    One label is collected per connected part, rather than a single overall
+    closest one, because splitting a shared skeleton can leave a tissue in
+    several disconnected parts. Small stray parts can then lie closer to the
+    anchor than the real junction does, and picking only the overall closest
+    label would trap the path search inside such a stray.
+    `get_long_path_in_graph_nodearea` simply takes whichever start yields the
+    longest path. If `anchor_mask` is None, the step is skipped and that
+    function falls back to using any node.
     """
 
     if sample.anchor_mask is None:
@@ -347,13 +554,16 @@ def find_start_label_close_to_anchor(sample: TissueSample) -> TissueSample:
 
     # now get distance map to the anchor tissue
     distance_map = distance_transform_edt(~sample.anchor_mask.astype(bool))
-    # disregard background pixels (set to inf distance)
-    distance_map[sample.labeled_segments == 0] = np.inf
 
-    # and find the pixel that is closest to the anchor tissue
-    closest_pixel = np.unravel_index(np.argmin(distance_map), distance_map.shape)
-    # and its corresponding label
-    sample.start_label = int(sample.labeled_segments[closest_pixel])
+    # for each segment, determine how far it is from the anchor tissue
+    labels_all = list(sample.segment_graph.nodes)
+    distance_per_label = dict(zip(labels_all, ndimage.minimum(
+        distance_map, sample.labeled_segments, index=labels_all)))
+
+    # and per connected part, keep the segment that's closest
+    sample.start_labels = \
+        [min(part, key=lambda lbl: distance_per_label[lbl])
+         for part in nx.connected_components(sample.segment_graph)]
 
     return sample
 
@@ -374,10 +584,10 @@ def get_long_path_in_graph_nodearea(sample: TissueSample) -> TissueSample:
         sample.length_pixels = 0.0
         return sample
 
-    # The start_label should contain the starting point closest to the anchor
+    # The start labels contain the starting points closest to the anchor
     # tissue (this is required, because there might be a longest path not
-    # touching the anchor), so we want to select that as starting node.
-    source_nodes = [sample.start_label] if sample.start_label in graph else list(graph.nodes)
+    # touching the anchor), so we want to select those as starting nodes.
+    source_nodes = sample.start_labels if sample.start_labels else list(graph.nodes)
 
     # Initialize
     longest_path = []
@@ -385,9 +595,10 @@ def get_long_path_in_graph_nodearea(sample: TissueSample) -> TissueSample:
 
     # check all pairs of nodes, and identify the longest shortest path between
     # the starting node and any other node
-    # check all pairs of nodes
+    # (splitting a shared skeleton can leave a tissue in disconnected pieces,
+    # so only consider the nodes that are reachable from the source)
     for source in source_nodes:
-        for target in graph.nodes:
+        for target in nx.node_connected_component(graph, source):
             if source != target:
                 path = nx.shortest_path(graph, source=source, target=target, weight='length')
                 # Calculate path length
@@ -559,12 +770,16 @@ def plot_all_plants_projected(
                                 edgecolor='red', facecolor='none')
         plt.gca().add_patch(rect)
 
-        # Project root skeleton pixels back to full-image coordinates
-        if plant.root.skeleton is not None and np.any(plant.root.skeleton):
+        # Project skeleton pixels back to full-image coordinates
+        # (showing the shared root+shoot skeleton where it is available)
+        skeleton_to_plot = plant.root.skeleton
+        if plant.combined is not None and plant.combined.skeleton is not None:
+            skeleton_to_plot = plant.combined.skeleton
+        if skeleton_to_plot is not None and np.any(skeleton_to_plot):
             ax.imshow(
-            plant.root.skeleton,
+            skeleton_to_plot,
             cmap=ListedColormap(["none", "gray"]),
-            alpha=(plant.root.skeleton > 0) * 1.0,
+            alpha=(skeleton_to_plot > 0) * 1.0,
             interpolation="none",
             extent=(minc, maxc, maxr, minr),  # project ROI back to full image
             )
@@ -617,24 +832,34 @@ def plot_all_plants_projected(
 
 def run_tissue_pipeline(sample: TissueSample,
                         config_pipeline: ConfigPipeline) -> TissueSample:
-    """Run the full default sequence of processing steps for one tissue."""
+    """
+    Run the full default sequence of processing steps for one tissue.
 
-    # Make binary and select largest ROI to analyze
-    sample = ensure_binary_mask(sample)
-    sample = keep_largest_connected_component(sample)
+    When a shared root+shoot skeleton was prepared already (see
+    `prepare_shared_skeleton`), the mask cleaning and skeletonization steps are
+    skipped, and this tissue's share of that skeleton is analyzed instead.
+    """
 
-    # smooth (morphological closing) the mask if desired
-    if config_pipeline.smoothing_diskradius is not None:
-        sample = apply_smoothing(sample, config_pipeline)
+    if sample.skeleton is None:
+
+        # Make binary and select largest ROI to analyze
+        sample = ensure_binary_mask(sample)
+        sample = keep_largest_connected_component(sample)
+
+        # smooth (morphological closing) the mask if desired
+        if config_pipeline.smoothing_diskradius is not None:
+            sample = apply_smoothing(sample, config_pipeline)
+
+        sample = generate_skeleton(sample)
 
     # Generate a labeled skeleton to analyze
-    sample = generate_skeleton_no_branchpoints(sample)
+    sample = analyze_skeleton_branchpoints(sample)
     sample = label_skeleton_segments(sample)
 
     # Build a graph, and find the longest path
     sample = build_segment_graph(sample)
         # plot_distance_graph(sample)
-    sample = find_start_label_close_to_anchor(sample)
+    sample = find_start_labels_close_to_anchor(sample)
     sample = get_long_path_in_graph_nodearea(sample)
     sample = build_longest_path_mask(sample)
         # plot_original_and_length(sample, plant_mask)
@@ -646,6 +871,11 @@ def run_tissue_pipeline(sample: TissueSample,
 def run_default_length_pipeline(plant: PlantSample,
                                 config_pipeline: ConfigPipeline) -> PlantSample:
     """Run the per-tissue pipeline for both root and shoot of one plant."""
+
+    # Derive both centerlines from one shared skeleton, if desired
+    # (falls through to independent processing if that doesn't work out)
+    if config_pipeline.shared_skeleton:
+        plant = prepare_shared_skeleton(plant, config_pipeline)
 
     # Process each tissue independently
     plant.root = run_tissue_pipeline(plant.root, config_pipeline)
