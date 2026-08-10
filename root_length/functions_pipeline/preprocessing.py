@@ -56,21 +56,29 @@ def normalize_rect(rect_raw, shape):
 
 def apply_mask_rect(mask, rect):
     """
-    Zero everything outside `rect=(r0,r1,c0,c1)`, returning a copy.
+    Keep only what's inside `rect=(r0,r1,c0,c1)`, returning a copy.
 
-    A None rect (no plate area known) returns the mask unchanged. Uses slice
-    assignments rather than building a boolean mask, so nothing image-sized is
-    allocated.
+    A None rect (no plate area known) returns the mask unchanged.
     """
     if rect is None:
         return mask
 
     r0, r1, c0, c1 = rect
-    out = mask.copy()
-    out[:r0] = 0
-    out[r1:] = 0
-    out[:, :c0] = 0
-    out[:, c1:] = 0
+    out = np.zeros_like(mask)
+    out[r0:r1, c0:c1] = mask[r0:r1, c0:c1]
+
+    return out
+
+
+def paste_inside_rect(edited, original, rect):
+    """Put `edited`'s content inside `rect` back into complete `original`
+    """
+    if rect is None:
+        return edited
+
+    r0, r1, c0, c1 = rect
+    out = original.copy()
+    out[r0:r1, c0:c1] = edited[r0:r1, c0:c1]
 
     return out
 

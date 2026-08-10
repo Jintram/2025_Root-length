@@ -129,15 +129,24 @@ stored parameter `prepr_info` in the segfile contains the cropping information.
     frame as `img_pred_lbls`, so already cropped by `prepr_info`).
     `mask_rect` is applied non-destructively: `analyze_plate` discards labels
     outside it when loading (switch: `ConfigPipeline.apply_mask_rect`), so the
-    segfile keeps everything and the rectangle stays correctable. It can be
-    dragged in the napari editor and is saved along with the labels.
-    Two functions can still clear it destructively if asked to:
-    `compute_and_save_mask_rect_all(clear_outside_mask=True)` and the
-    "Preview: clear outside rect" button in the editor.
+    segfile keeps everything and the rectangle stays correctable.
+    The napari editor shows the same filtered view, lets the rectangle be
+    dragged, and saves it along with the labels; labels it hid are put back on
+    save, so widening the rectangle later brings them back. Use its
+    "Save + reload plate" button to see the effect of a changed rectangle.
+    Only `compute_and_save_mask_rect_all(clear_outside_mask=True)` still
+    clears labels destructively, and it is off by default.
     - Reading either rect from a segfile goes through
     `preprocessing.normalize_rect`, which unwraps the np.savez quirks and
     clamps to the image (a negative coordinate would silently wrap when
-    slicing, rather than raise). Apply with `preprocessing.apply_mask_rect`.
+    slicing, rather than raise). Apply with `preprocessing.apply_mask_rect`,
+    and merge edits back into the complete labels with
+    `preprocessing.paste_inside_rect`.
+    - `edit_annotation_napari` is also handed to the external cheeky_cells
+    library (from [segmentation_training](segmentation_training/)), which calls
+    it with 3 positional arguments and unpacks 2 return values. Scripts must
+    pass `edit_annotation_napari_cheekycells`, the adapter that keeps that
+    older shape; drop it once cheeky_cells is updated.
 
 
 ---

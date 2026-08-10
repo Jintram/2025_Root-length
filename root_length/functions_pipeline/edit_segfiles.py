@@ -470,21 +470,30 @@ def remove_large_foregroundregions(mask, min_size):
 def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
                            title="Editing segmentation (for roots)",
                            session_state=None, curr_file=None,
-                           extras=None):
+                           mask_rect=None):
     '''
     Opens napari with `image` as background and `segmentation` as an editable
     label layer, optionally styled with `mylabelcolormap`.
 
-    Returns `(seg_data, return_requests)`, where `seg_data` is the edited
-    annotation (or None if the user chose not to save) and `return_requests`
-    is a dict carrying signals back to the caller. Currently used keys:
-        - 'quitloop_flag' (bool): user pressed 'q' to quit the outer loop.
-        - 'go_to' (int or None): user pressed 'j' and requested to jump to
-          this 1-based sample number (without saving).
-        - 'extras_update' (dict or None): extra arrays to store next to the
-          labels, currently the (possibly edited) 'mask_rect'. Pass on to
-          `_save_segfile` when saving `seg_data`.
-    Callers should treat unknown keys gracefully; new keys may be added.
+    `segmentation` is always the complete label image. `mask_rect`, if given
+    as (r0, r1, c0, c1), is the plate area: only that part is shown, which is
+    what `analyze_plate` will end up measuring. The rest is not thrown away —
+    the labels handed back are the complete ones again, with only the shown
+    part replaced by the edited version. So the rectangle can be widened later
+    and the labels outside it are still there.
+
+    Returns `(seg_data, mask_rect, return_requests)`:
+        - seg_data: the complete edited labels, or None if the user chose not
+          to save.
+        - mask_rect: the plate area as the user left it, or None (both when
+          they deleted the rectangle and when nothing is to be saved). Note
+          this is the *new* rect; the labels were merged using the old one.
+        - return_requests: a dict of control-flow signals for the caller:
+            - 'quitloop_flag' (bool): user pressed 'q' to quit the outer loop.
+            - 'go_to' (int or None): user asked to jump to this 1-based sample
+              number, either by pressing 'j' (without saving) or via the
+              "Save + reload plate" button (with saving).
+          Callers should treat unknown keys gracefully; new keys may be added.
 
     If `session_state` (an `EditorSessionState`) is provided, widget and layer
     settings (shift, size thresholds, active label, brush size) are restored
@@ -493,16 +502,14 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
 
     If `curr_file` is provided (a fileinfo-like object with `.fullpath`), a
     "Save now" button is added to the tools panel; clicking it writes the
-    current labels layer back to the .npz via `_save_segfile`. If `curr_file`
-    is None, no save button is shown and the 'w' key is a no-op.
+    current labels back to the .npz via `_save_segfile`, and the rectangle
+    becomes editable. If `curr_file` is None there is nowhere to store a rect,
+    so no rectangle layer and no save button are shown, and 'w' is a no-op.
 
-    `extras` may hold a 'mask_rect' (r0, r1, c0, c1) marking the plate area,
-    which is shown as an editable red rectangle. Any change to it is saved
-    along with the labels (see 'extras_update' above). Deleting the rectangle
-    leaves the stored one untouched. The "Preview: clear outside rect" button
-    shows what the analysis will make of it — the analysis discards labels
-    outside the rectangle when loading, so clearing them here is not needed,
-    and saving afterwards makes the removal permanent.
+    To see the effect of a moved rectangle, use the "Save + reload plate"
+    button: it saves and reopens the file, which redoes the filtering with the
+    new rect. It is a jump to the current sample, so it needs a caller that
+    acts on 'go_to' and a `curr_file.file_idx` (ie `edit_all_segfiles`).
 
     # Note to self, already used by Napari:
     1, 2, 3, 4, 5, 6, 7, 8, 9, 0, [, ], -, =, a, d, e, f, i, l, m, p, s, v, z
@@ -511,8 +518,12 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
 
     if session_state is None:
         session_state = EditorSessionState()
-    if extras is None:
-        extras = {}
+
+    # The rect as it is on opening. Kept apart from whatever the user drags it
+    # to later (`_rect_from_layer()`), because this is the one that determines
+    # which part of the labels was shown, and hence which part may be replaced
+    # when saving.
+    rect_at_load = plprep.normalize_rect(mask_rect, segmentation.shape)
 
     # Explain options to user
     print("____\nStarting Napari editor window\n===\nq=quit without saving,"+
@@ -558,35 +569,41 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     labels_kwargs = dict(name='segmentation')
     if mylabelcolormap is not None:
         labels_kwargs['colormap'] = mylabelcolormap
-    labels_layer = viewer.add_labels(segmentation, **labels_kwargs)
+    # Only the plate area is shown, so that this is what analyze_plate sees too
+    labels_layer = viewer.add_labels(
+        plprep.apply_mask_rect(segmentation, rect_at_load), **labels_kwargs)
 
     # ----- overlay: editable mask_rect rectangle ------------------------------
-    # The layer is always added, also when the file has no mask_rect yet, so a
-    # plate area can be drawn from scratch. Note it deliberately shares the
-    # coordinate frame of the labels layer, not of the (shift-widget
+    # Also added when there is no rect yet, so a plate area can be drawn from
+    # scratch; but not when there is no file to store one in. Note it shares
+    # the coordinate frame of the labels layer, not of the (shift-widget
     # translated) image layer.
-    mask_rect = plprep.normalize_rect(extras.get('mask_rect'), segmentation.shape)
-    if mask_rect is not None:
-        r0, r1, c0, c1 = mask_rect
-        rect_data = [np.array([[r0, c0], [r0, c1], [r1, c1], [r1, c0]])]
-    else:
-        rect_data = []
-    rect_layer = viewer.add_shapes(
-        rect_data, shape_type='rectangle',
-        edge_color='red', face_color='transparent',
-        edge_width=4, name='mask_rect',
-    )
-    rect_layer.editable = True
+    rect_layer = None
+    if curr_file is not None:
+        if rect_at_load is not None:
+            r0, r1, c0, c1 = rect_at_load
+            rect_data = [np.array([[r0, c0], [r0, c1], [r1, c1], [r1, c0]])]
+        else:
+            rect_data = []
+        rect_layer = viewer.add_shapes(
+            rect_data, shape_type='rectangle',
+            edge_color='red', face_color='transparent',
+            edge_width=4, name='mask_rect',
+        )
+        rect_layer.editable = True
 
     def _rect_from_layer():
         """
-        Current plate area as (r0, r1, c0, c1), or None if there is no shape.
+        Plate area as the user left it, or None if there is no rectangle.
 
         Read as a bounding box rather than by corner index, since dragging or
         rotating a napari rectangle does not preserve the order the corners
-        were created in.
+        were created in. None (a deleted rectangle) means "leave the stored
+        one alone" — deleting the shape is more likely a slip than a request
+        to drop the plate area.
         """
-        if len(rect_layer.data) == 0:
+        if (rect_layer is None) or (len(rect_layer.data) == 0):
+            print(f"  Warning: no shapes in the mask_rect layer, not updating mask.")
             return None
         if len(rect_layer.data) > 1:
             print(f"  Warning: {len(rect_layer.data)} shapes in the mask_rect "
@@ -596,18 +613,18 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
         return plprep.normalize_rect(
             (rows.min(), rows.max(), cols.min(), cols.max()), segmentation.shape)
 
-    def _rect_extras_update():
-        """
-        The `mask_rect` entry to write along with the labels, or None.
+    def _labels_for_save():
+        """The complete labels again, with the edited plate area pasted in."""
+        return plprep.paste_inside_rect(labels_layer.data, segmentation,
+                                        rect_at_load)
 
-        Returns None when the rectangle was deleted (or never existed), in
-        which case whatever is on disk is left alone — deleting the shape is
-        more likely a slip than a request to drop the plate area.
-        """
+    def _save_now():
+        """Write the labels and the plate rect back to the .npz (needs curr_file)."""
         rect = _rect_from_layer()
-        if rect is None:
-            return None
-        return {'mask_rect': np.asarray(rect, dtype=np.int64)}
+        _save_segfile(
+            curr_file, _labels_for_save(),
+            extras_update=(None if rect is None else
+                           {'mask_rect': np.asarray(rect, dtype=np.int64)}))
 
     # ----- widget: shift image layer visually ---------------------------------
     @magicgui(
@@ -647,36 +664,28 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     
     # (added to viewer below, using container)
 
-    # ----- widget: preview the effect of the plate rectangle -------------------
-    # The analysis discards labels outside mask_rect at load time, so this is
-    # only a preview of what it will see. Note it does edit the labels layer
-    # (like the two buttons above, it can't be undone with ctrl+z), so saving
-    # afterwards does make the removal permanent.
-    @magicgui(call_button="Preview: clear outside rect")
-    def preview_rect_widget():
-        rect = _rect_from_layer()
-        if rect is None:
-            print("  No rectangle drawn — nothing to clear.")
-            return
-        mask = labels_layer.data
-        n_labeled_before = np.count_nonzero(mask)
-        labels_layer.data = plprep.apply_mask_rect(mask, rect)
-        n_cleared = n_labeled_before - np.count_nonzero(labels_layer.data)
-        print(f"  Cleared {n_cleared} labeled px outside rect {rect}.")
-
-    # (added to viewer below, using container)
-
     # ----- widget: save current labels to disk --------------------------------
-    # Only available when curr_file was provided; otherwise the button is
-    # omitted entirely so the other repo's call sites are unaffected.
-    tool_widgets = [shift_widget, remove_small_widget, remove_large_widget,
-                    preview_rect_widget]
+    # Saving from within the viewer is only possible when curr_file was given;
+    # otherwise the button is omitted and the caller saves what we return.
+    tool_widgets = [shift_widget, remove_small_widget, remove_large_widget]
     if curr_file is not None:
         @magicgui(call_button="Save now")
         def save_widget():
-            _save_segfile(curr_file, labels_layer.data,
-                          extras_update=_rect_extras_update())
+            _save_now()
         tool_widgets.append(save_widget)
+
+    # ----- widget: save and reopen the same plate -----------------------------
+    # After dragging the rectangle, this is how you see what it did: saving and
+    # reopening re-runs the load-time filtering with the new rect. Implemented
+    # as a jump to the current sample, so it only works via the file loop that
+    # handles 'go_to' (ie edit_all_segfiles, which sets file_idx).
+    if (curr_file is not None) and (getattr(curr_file, 'file_idx', None) is not None):
+        @magicgui(call_button="Save + reload plate")
+        def reload_widget():
+            print("  Reload pressed — saving and reopening this plate.")
+            return_requests['go_to'] = curr_file.file_idx + 1
+            viewer.close()
+        tool_widgets.append(reload_widget)
 
     # ----- dock widgets as a single stacked panel ------------------------------
     tools_container = Container(widgets=tool_widgets)
@@ -800,8 +809,7 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
             print("  'w' pressed — Save function NOT available now.")
             return
         print("  'w' pressed — saving current labels.")
-        _save_segfile(curr_file, labels_layer.data,
-                      extras_update=_rect_extras_update())
+        _save_now()
 
     # ----- keybinding: j = jump to a specific sample --------------------------
     @viewer.bind_key('j')
@@ -844,11 +852,38 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     # ----- after viewer is closed ---------------------------------------------
     # (layers are plain python/numpy objects, so unlike the Qt widgets above
     # they can still be read now that the window is gone)
-    return_requests['extras_update'] = _rect_extras_update()
     if save_on_close[0]:
-        return labels_layer.data, return_requests
+        return _labels_for_save(), _rect_from_layer(), return_requests
     else:
-        return None, return_requests
+        return None, None, return_requests
+
+
+################################################################################
+# %% adapter for cheeky_cells
+
+def edit_annotation_napari_cheekycells(image, segmentation, mylabelcolormap=None,
+                                       title="Editing segmentation"):
+    """
+    `edit_annotation_napari` in the shape cheeky_cells expects it.
+
+    cheeky_cells (annotation_aided.annotate_tiles) calls its
+    `mynaparifunction` with 3 positional arguments and unpacks 2 return
+    values, which is what this repo's editor looked like before it grew the
+    plate rectangle. Rather than freeze the editor into that shape, this
+    adapter absorbs the difference: assign *this* to `config1.my_napari_function`.
+
+    There is no plate rectangle when annotating training tiles, and
+    cheeky_cells saves the returned array itself, so `mask_rect` and
+    `curr_file` are left out and the rect is dropped from the return.
+
+    Delete this once cheeky_cells is updated to the current signature.
+    (`return_requests` is passed back as-is; cheeky_cells already unwraps
+    'quitloop_flag' from a dict in that position.)
+    """
+    seg_data, _, return_requests = edit_annotation_napari(
+        image, segmentation, mylabelcolormap=mylabelcolormap, title=title)
+
+    return seg_data, return_requests
 
 
 ################################################################################
@@ -860,6 +895,11 @@ def edit_segfile_single(curr_file, dir_imagefiles=None, session_state=None):
 
     The user can edit the labeled mask using default napari tools.
     See `edit_annotation_napari` for the full keybinding list.
+
+    Only the plate area (`mask_rect`) is shown, the same part `analyze_plate`
+    measures; the labels outside it are kept and written back untouched. This
+    function does the .npz translation: rects in and out of napari are plain
+    (r0, r1, c0, c1) tuples, the int64 array is a storage detail.
 
     Input parameters:
     - curr_file: a fileinfo object (from root_length.functions_files.filelisting)
@@ -911,22 +951,24 @@ def edit_segfile_single(curr_file, dir_imagefiles=None, session_state=None):
             else:
                 print("No cropping info found..")
     
-    # Open napari for editing
-    seg_data, return_requests = edit_annotation_napari(
+    # Open napari for editing. The complete mask goes in; only the plate area
+    # is shown (as analyze_plate sees it), and the complete mask comes back.
+    seg_data, mask_rect, return_requests = edit_annotation_napari(
         image=img_original,
         segmentation=img_mask,
         mylabelcolormap=plutils.custom_colors_plantclasses,
         title=f"Editing #{curr_file.file_idx+1}: {curr_file.filename} ({curr_file.subdir})",
         session_state=session_state,
         curr_file=curr_file,
-        extras = {'mask_rect': extra_arrays.get('mask_rect', None)},
+        mask_rect=extra_arrays.get('mask_rect'),
     )
-    
-    # Save or skip based on napari result
-    # (the plate rectangle may have been adjusted in napari, and rides along)
+
+    # Save or skip based on napari result. A None mask_rect (rectangle deleted,
+    # or never there) leaves whatever is stored on disk alone.
     if seg_data is not None:
         _save_segfile(curr_file, seg_data,
-                      extras_update=return_requests.get('extras_update'))
+                      extras_update=(None if mask_rect is None else
+                                     {'mask_rect': np.asarray(mask_rect, dtype=np.int64)}))
     else:
         print(f"  Not saved: {segfile_path}")
     
