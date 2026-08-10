@@ -124,9 +124,20 @@ This repo runs in `cheeky-all` conda env, ie `conda activate cheeky-all`.
 the segfiles will be cropped. To translate from the original images, the
 stored parameter `prepr_info` in the segfile contains the cropping information. 
     - have a cropping recteangle attached that was determined afterwards, 
-    which is stored in the parameter `mask_rect` in the segfile. 
-    Depending on settings, the segfile might be cleaned outside that mask
-    by the `compute_and_save_mask_rect_all` function.
+    which is stored in the parameter `mask_rect` in the segfile 
+    (4 numbers `(r0, r1, c0, c1)`, never a raster mask; in the same coordinate
+    frame as `img_pred_lbls`, so already cropped by `prepr_info`).
+    `mask_rect` is applied non-destructively: `analyze_plate` discards labels
+    outside it when loading (switch: `ConfigPipeline.apply_mask_rect`), so the
+    segfile keeps everything and the rectangle stays correctable. It can be
+    dragged in the napari editor and is saved along with the labels.
+    Two functions can still clear it destructively if asked to:
+    `compute_and_save_mask_rect_all(clear_outside_mask=True)` and the
+    "Preview: clear outside rect" button in the editor.
+    - Reading either rect from a segfile goes through
+    `preprocessing.normalize_rect`, which unwraps the np.savez quirks and
+    clamps to the image (a negative coordinate would silently wrap when
+    slicing, rather than raise). Apply with `preprocessing.apply_mask_rect`.
 
 
 ---

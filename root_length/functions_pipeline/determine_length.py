@@ -80,6 +80,8 @@ class ConfigPipeline:
     shared_skeleton_flag: bool = True
     # largest dilation radius allowed to bridge holes in the root+shoot mask
     dilation_radius_maximum: int = 15
+    # ignore labels outside the stored plate area (`mask_rect`) when loading
+    apply_mask_rect: bool = True
 
 @dataclass
 class PlantSample:

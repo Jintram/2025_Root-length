@@ -17,10 +17,71 @@ import root_length.functions_pipeline.utils as plutils
 
 
 ################################################################################
-# %% rect <-> mask helpers
+# %% rect helpers
+#
+# The plate area is stored in the segfiles as `mask_rect` = (r0, r1, c0, c1),
+# ie 4 numbers, never as a raster mask; it lives in the same coordinate frame
+# as `img_pred_lbls` (so already cropped by `prepr_info` where applicable).
+# `normalize_rect` is the single entry point for reading one off disk or out of
+# a napari shape, since both can hand us junk (0-d object arrays, out-of-bounds
+# coordinates after dragging).
+
+def normalize_rect(rect_raw, shape):
+    """
+    Turn a raw stored/drawn rect into a clean `(r0, r1, c0, c1)` int tuple.
+
+    Handles the np.savez round-trip quirks (`array(None)`, 0-d arrays) and
+    clamps to `shape`, which matters because a negative coordinate would not
+    raise but silently wrap around when used to slice. Returns None if there is
+    no rect, if it doesn't hold 4 numbers, or if it is empty after clamping.
+    """
+    # Unwrap the various shapes np.savez/np.load hands back
+    if isinstance(rect_raw, np.ndarray) and rect_raw.ndim == 0:
+        rect_raw = rect_raw.item()
+    if rect_raw is None:
+        return None
+    values = np.asarray(rect_raw).ravel()
+    if len(values) != 4:
+        return None
+
+    # Clamp into the image, then reject degenerate rects
+    r0, r1, c0, c1 = (int(round(float(v))) for v in values)
+    r0, r1 = max(0, r0), min(int(shape[0]), r1)
+    c0, c1 = max(0, c0), min(int(shape[1]), c1)
+    if (r0 >= r1) or (c0 >= c1):
+        return None
+
+    return (r0, r1, c0, c1)
+
+
+def apply_mask_rect(mask, rect):
+    """
+    Zero everything outside `rect=(r0,r1,c0,c1)`, returning a copy.
+
+    A None rect (no plate area known) returns the mask unchanged. Uses slice
+    assignments rather than building a boolean mask, so nothing image-sized is
+    allocated.
+    """
+    if rect is None:
+        return mask
+
+    r0, r1, c0, c1 = rect
+    out = mask.copy()
+    out[:r0] = 0
+    out[r1:] = 0
+    out[:, :c0] = 0
+    out[:, c1:] = 0
+
+    return out
+
 
 def rect_to_mask(rect, shape):
-    """Build a boolean mask of `shape` that's True inside `rect=(r0,r1,c0,c1)`."""
+    """
+    Build a boolean mask of `shape` that's True inside `rect=(r0,r1,c0,c1)`.
+
+    Not used by the pipeline itself (which slices rects directly, see
+    `apply_mask_rect`); kept as a convenience for interactive work.
+    """
     mask = np.zeros(shape, dtype=bool)
     r0, r1, c0, c1 = rect
     mask[r0:r1, c0:c1] = True

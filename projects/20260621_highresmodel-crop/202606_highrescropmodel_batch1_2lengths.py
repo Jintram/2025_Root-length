@@ -37,10 +37,8 @@ df_filelist, metadata_toseg_filepath = \
 
 ################################################################################
 # %% Compute plate-area rect per file and store as `mask_rect` in each segfile.
-# Reconstruct the mask later via preprocessing.rect_to_mask(rect, shape).
-
-# TO DO: option to clear areas outside the mask,
-# TEST parameter that only touches the first X files
+# The rect can be corrected by hand in the napari editor below; the analysis
+# ignores labels outside it when loading, so nothing needs clearing here.
 
 # import importlib; importlib.reload(pledit)
 
@@ -49,7 +47,7 @@ pledit.compute_and_save_mask_rect_all(
     dir_inputfiles=DIR_INPUTFILES,
     dir_imagefiles=DIR_IMAGEFILES,
     only_process_n=None,        # int N for a test run, or None to process all
-    clear_outside_mask=True,   # True to also zero seg labels outside the rect
+    clear_outside_mask=False,  # True to destructively zero labels outside the rect
     overwrite=False
 )
 
