@@ -79,6 +79,7 @@ def analyze_plate(curr_file, config_pipeline):
     # Build PlantSample objects for each QC-passed plant
     current_sample_all_plants = []
     for idx, plant_mask in enumerate(list_img_indivplants[sel_plants]):
+        # idx = 6; plant_mask = list_img_indivplants[sel_plants][idx]
 
         root_mask = plant_mask == 2
         shoot_mask = plant_mask == 1
@@ -108,6 +109,7 @@ def analyze_plate(curr_file, config_pipeline):
     for i, sample in enumerate(current_sample_all_plants):
         # i = 1; sample=current_sample_all_plants[i]
         # i = 14; sample=current_sample_all_plants[i]
+        # i = 6;  sample=current_sample_all_plants[i]
         
         print(f"Currently processing plant {i+1} of {len(current_sample_all_plants)}")
         
@@ -171,6 +173,7 @@ def analyze_all_plates(df_filelist, output_dir, config_pipeline=None):
 
     time_taken = []
     for file_idx in range(len(df_filelist)):
+        # file_idx = 5
         # file_idx = 1
         # file_idx = 37
         # file_idx = 462

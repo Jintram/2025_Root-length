@@ -79,7 +79,7 @@ class ConfigPipeline:
     # derive root and shoot centerlines from one shared skeleton
     shared_skeleton_flag: bool = True
     # largest dilation radius allowed to bridge holes in the root+shoot mask
-    dilation_radius_maximum: int = 10
+    dilation_radius_maximum: int = 15
 
 @dataclass
 class PlantSample:
@@ -220,14 +220,14 @@ def dilate_to_connect(mask, config_pipeline):
         return mask, 0, True
 
     # Half the largest gap suffices, +1 as margin for the discrete disk
-    radius = int(np.ceil(distances.max() / 2)) + 1
-
-    # abort if radius too large
-    if radius > config_pipeline.dilation_radius_maximum:
-        return mask, None, False
+    radius = np.min([int(np.ceil(distances.max() / 2)) + 1,
+                     # cap radius by maximum that was set
+                     config_pipeline.dilation_radius_maximum])
 
     # perform dilation
     mask_dilated = morphology.binary_dilation(mask, morphology.disk(radius))
+        # plt.imshow(mask_dilated)
+        # plt.imshow(mask)
 
     # Give up if this didn't actually result in one single region
     if label(mask_dilated, return_num=True)[1] >1:
@@ -327,7 +327,9 @@ def prepare_shared_skeleton(plant: PlantSample,
 
     # Bridge holes that would otherwise fragment the skeleton
     plant.combined.clean_mask, plant.dilation_radius_used, mask_connected = \
-        dilate_to_connect(plant.combined.clean_mask, config_pipeline)
+        dilate_to_connect(mask=plant.combined.clean_mask, 
+                          config_pipeline=config_pipeline)
+        # plt.imshow(plant.combined.clean_mask)
 
     # Bail out if the mask couldn't be made whole; skeletonizing a mask that is
     # still in pieces gives each tissue a truncated centerline

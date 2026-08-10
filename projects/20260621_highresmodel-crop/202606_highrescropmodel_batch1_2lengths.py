@@ -84,15 +84,14 @@ from root_length.functions_pipeline.determine_length import ConfigPipeline
 config_pipeline = \
     ConfigPipeline(
         # Smooths the root/shoots to avoid spurious branching
-        smoothing_diskradius=5
+        smoothing_diskradius=5,
+        dilation_radius_maximum=15
         )
 
 # test run
 plap.analyze_all_plates(df_filelist=df_filelist[:10],
                         output_dir=DIR_OUTPUTFILES, 
                         config_pipeline=config_pipeline)
-
-
 
 # full run
 plap.analyze_all_plates(df_filelist=df_filelist,
