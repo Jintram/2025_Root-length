@@ -87,7 +87,7 @@ def _backup_if_needed(filepath):
         print(f"  Backup already exists: {backup_path}")
 
 
-def _save_segfile(curr_file, mask, extras_update=None):
+def _save_segfile(curr_file, mask, mask_rect=None):
     """
     Save `mask` into `curr_file`'s .npz, preserving any other arrays on disk.
 
@@ -95,15 +95,16 @@ def _save_segfile(curr_file, mask, extras_update=None):
     so any external changes are not clobbered. A one-time backup is made before
     the first overwrite via `_backup_if_needed`.
 
-    `extras_update` is an optional dict of extra arrays to add/overwrite
-    (used to write back a `mask_rect` edited in napari).
+    `mask_rect` is the plate area as an (r0, r1, c0, c1) tuple; None leaves
+    whatever is stored on disk alone. Being int64 on disk is a storage detail
+    and lives here, so callers can pass plain tuples.
     """
     segfile_path = curr_file.fullpath
     segfile_data = np.load(segfile_path, allow_pickle=True)
     extra_arrays = {k: segfile_data[k] for k in segfile_data.files
                     if k != 'img_pred_lbls'}
-    if extras_update is not None:
-        extra_arrays.update(extras_update)
+    if mask_rect is not None:
+        extra_arrays['mask_rect'] = np.asarray(mask_rect, dtype=np.int64)
     _backup_if_needed(segfile_path)
     np.savez_compressed(segfile_path, img_pred_lbls=mask, **extra_arrays)
     print(f"  Saved: {segfile_path}")
@@ -620,11 +621,7 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
 
     def _save_now():
         """Write the labels and the plate rect back to the .npz (needs curr_file)."""
-        rect = _rect_from_layer()
-        _save_segfile(
-            curr_file, _labels_for_save(),
-            extras_update=(None if rect is None else
-                           {'mask_rect': np.asarray(rect, dtype=np.int64)}))
+        _save_segfile(curr_file, _labels_for_save(), mask_rect=_rect_from_layer())
 
     # ----- widget: shift image layer visually ---------------------------------
     @magicgui(
@@ -897,9 +894,7 @@ def edit_segfile_single(curr_file, dir_imagefiles=None, session_state=None):
     See `edit_annotation_napari` for the full keybinding list.
 
     Only the plate area (`mask_rect`) is shown, the same part `analyze_plate`
-    measures; the labels outside it are kept and written back untouched. This
-    function does the .npz translation: rects in and out of napari are plain
-    (r0, r1, c0, c1) tuples, the int64 array is a storage detail.
+    measures; the labels outside it are kept and written back untouched.
 
     Input parameters:
     - curr_file: a fileinfo object (from root_length.functions_files.filelisting)
@@ -966,9 +961,7 @@ def edit_segfile_single(curr_file, dir_imagefiles=None, session_state=None):
     # Save or skip based on napari result. A None mask_rect (rectangle deleted,
     # or never there) leaves whatever is stored on disk alone.
     if seg_data is not None:
-        _save_segfile(curr_file, seg_data,
-                      extras_update=(None if mask_rect is None else
-                                     {'mask_rect': np.asarray(mask_rect, dtype=np.int64)}))
+        _save_segfile(curr_file, seg_data, mask_rect=mask_rect)
     else:
         print(f"  Not saved: {segfile_path}")
     
@@ -1130,16 +1123,13 @@ def compute_and_save_mask_rect_all(df_filelist, dir_inputfiles, dir_imagefiles,
             min_expected_area=min_expected_area)
 
         # Optionally clear seg labels outside the rect
-        if clear_outside_mask and ('img_pred_lbls' in existing):
-            seg = existing['img_pred_lbls']
-            existing['img_pred_lbls'] = plprep.apply_mask_rect(
-                seg, plprep.normalize_rect(rect, seg.shape))
+        seg = existing['img_pred_lbls']
+        if clear_outside_mask:
+            seg = plprep.apply_mask_rect(seg, plprep.normalize_rect(rect, seg.shape))
             print("  Cleared seg labels outside rect.")
 
-        # Save (preserve all existing keys, add/overwrite mask_rect)
-        _backup_if_needed(segfile_path)
-        existing['mask_rect'] = np.asarray(rect, dtype=np.int64)
-        np.savez_compressed(segfile_path, **existing)
+        # Save (other keys, eg prepr_info, are preserved by _save_segfile)
+        _save_segfile(curr_file, seg, mask_rect=rect)
         print(f"  Saved mask_rect={tuple(int(v) for v in rect)}")
 
     print("Done computing mask_rect for all segfiles.")
