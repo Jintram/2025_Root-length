@@ -61,6 +61,19 @@ these two training sets could be combined.
     
 ## 2026-08-04
 
+**
+
+CONTINUE HERE
+
+CONTINUE WITH MAKING A "WALK-THROUGH" OF THE CODE, USING PY FILES IN:
+projects/20260621_highresmodel-crop-TESTSET
+
+CAN FIRST DO SEGMENTATION AND THEN THE LENGTH ANALYSIS (two different py files)
+
+(END CONTINUE HERE)
+
+**
+
 - [ ] See previous entries
     - [X] (better skeleton at tissue-tissue boundaries)
     - [ ] (cropping)
