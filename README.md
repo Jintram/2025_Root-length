@@ -139,7 +139,9 @@ Graph:
 
 
 
+# Installation instructions for developers
 
+- Contributors additionally install: `mamba install -c conda-forge pytest ruff`
 
 
 # Potential things to improve

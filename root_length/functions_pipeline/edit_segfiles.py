@@ -838,7 +838,11 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
             _widget.called.connect(lambda *_: _focus_canvas())
 
     # ----- dock widgets as a single stacked panel ------------------------------
-    tools_container = Container(widgets=tool_widgets)
+    # `labels=False`: magicgui otherwise puts every child in a two-column row
+    # with a (here always empty) name label on the left, which indents the info
+    # box and the buttons. The magicgui widgets keep their own internal labels
+    # ("Min area (px)" etc.), as those live in their own containers.
+    tools_container = Container(widgets=tool_widgets, labels=False)
     viewer.window.add_dock_widget(tools_container, name="Tools")
 
     # ----- restore persisted session state ------------------------------------

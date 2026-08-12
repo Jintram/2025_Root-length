@@ -90,9 +90,40 @@ Package metadata lives in [pyproject.toml](pyproject.toml). Dependencies are
 
 This project uses **conda**, not pip-managed virtualenvs.
 
-**No test suite, linter, or CI is configured.** Do not invent commands like
-`pytest`, `ruff`, or `make test` — they will not exist. Validate changes by
-running the relevant pipeline script or by importing the modified module.
+**No human-made test suites, only Claude-generated testing.** `pytest` is
+installed and can be used sparingly. There's no human-coded test suite: this is
+not production-grade code, but an academic project where bugs surface during
+manual use. Keep testing light.
+
+Claude-written tests are **kept and expected to pass** — they form a small
+regression net.
+
+- Save as `tests/test_byclaude_<somescript>.py`, where `<somescript>` is the
+  module under test.
+- After changing a module, run its test file
+  (`pytest tests/test_byclaude_<somescript>.py`); run `pytest tests/` if the
+  change was broad.
+- Each file opens with a docstring recording **the date**, **which module and
+  functions it covers**, and **the assumed behaviour** it pins down — one line
+  per test. Each test function gets a one-line docstring naming the behaviour it
+  checks. This documentation is what makes a later session able to judge a
+  failure, so it is a deliberate exception to the "don't write docstrings"
+  preference below.
+
+When a test fails, decide which case applies before changing anything:
+
+1. *The behaviour is still intended* → the recent code change is a bug. Fix the
+   code.
+2. *The behaviour was deliberately changed* → the test is stale. Update it only
+   if the new intended behaviour is unambiguous. Otherwise mark it
+   `@pytest.mark.skip(reason="STALE <date>: <what changed>")`, leave it in
+   place, and report it to the user for updating or removal.
+
+Never weaken an assertion or delete a test just to get green — that silently
+discards the regression net.
+
+`ruff` is installed as well, but is not intended to be used, as code is
+non-compliant (and doesn't aim to).
 
 This repo runs in `cheeky-all` conda env, ie `conda activate cheeky-all`.
 
