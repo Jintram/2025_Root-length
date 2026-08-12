@@ -5,10 +5,17 @@ Edit segmentation files interactively using napari.
 Opens each segmentation file (.npz) in a napari viewer, allowing the user
 to correct labeled masks using the default napari label-editing tools.
 
-Keybindings:
+Keybindings (also listed in the editor's Tools panel):
     q - quit the loop without saving the current file
     n - go to the next file without saving the current file
-    r - call a custom action on the mask at the current mouse position
+    j - jump to another sample number (without saving)
+    u - relabel plant regions using the drawn root/shoot lines
+    w - save the current labels (and plate rectangle) to disk
+    r - draw a root/shoot line at the current mouse position
+    t - draw a through-line at the current mouse position
+
+Everything except r and t also has a button in the Tools panel, captioned with
+its key; see the `ACTIONS` table in `edit_annotation_napari`.
 """
 
 
@@ -25,7 +32,7 @@ from dataclasses import dataclass
 import numpy as np
 import napari
 from magicgui import magicgui
-from magicgui.widgets import Container
+from magicgui.widgets import Container, Label, PushButton
 
 import root_length.functions_files.filelisting as ffl
     # import importlib; importlib.reload(ffl)
@@ -504,7 +511,7 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     files.
 
     If `curr_file` is provided (a fileinfo-like object with `.fullpath`), a
-    "Save now" button is added to the tools panel; clicking it writes the
+    "Save now [w]" button is added to the tools panel; clicking it writes the
     current labels back to the .npz via `_save_segfile`, and the rectangle
     becomes editable. If `curr_file` is None there is nowhere to store a rect,
     so no rectangle layer and no save button are shown, and 'w' is a no-op.
@@ -518,9 +525,15 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     `napari_analysis`), which measures the labels as they are on screen and
     draws the result in extra `analysis: ...` layers. Nothing is saved by it.
 
+    Every action of this editor is declared once in the `ACTIONS` table below,
+    which is what builds the keybindings, the buttons and the help text, so the
+    three cannot drift apart. Actions that read the mouse position ('r', 't')
+    deliberately get no button and are listed in the panel's info box instead.
+
     # Note to self, already used by Napari:
     1, 2, 3, 4, 5, 6, 7, 8, 9, 0, [, ], -, =, a, d, e, f, i, l, m, p, s, v, z
     # Used by this function: q, n, r, t, u, w, j
+    # Still free: b, c, g, h, k, o, x, y
     '''
 
     if session_state is None:
@@ -532,15 +545,10 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     # when saving.
     rect_at_load = plprep.normalize_rect(mask_rect, segmentation.shape)
 
-    # Explain options to user
-    print("____\nStarting Napari editor window\n===\nq=quit without saving,"+
-          "\nn=next file without saving,"+
-          "\nr=draw root/shoot line, \nt=draw through-line, \nu=relabel by lines,"+
-          "\nw=save current labels (if curr_file given),"+
-          "\nj=jump to sample number (handled by caller; closes without saving)"+
-          "\n____")
+    # (the user-facing key/button overview is printed further down, where the
+    # ACTIONS table that it is generated from is defined)
 
-    # Signals returned to the caller. Mutated by key handlers below.
+    # Signals returned to the caller. Mutated by the actions below.
     return_requests = {'quitloop_flag': False, 'go_to': None}
     save_on_close = [True]
     
@@ -667,15 +675,130 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     
     # (added to viewer below, using container)
 
-    # ----- widget: save current labels to disk --------------------------------
+    # ----- the editor's own actions -------------------------------------------
+    # Declared once, in ACTIONS below, and turned into keybindings, buttons and
+    # help text by the same loop — so a user pressing keys and a user clicking
+    # buttons get the same set of features, and the captions cannot go stale.
+
+    qt_window = viewer.window._qt_window
+
+    def _focus_canvas():
+        """
+        Hand keyboard focus back to the canvas after a button press.
+
+        Otherwise focus stays in the dock, and the next keystroke is eaten by
+        whichever spinbox has it — which reads as "the shortcuts don't work".
+        Private napari API, hence the bare except.
+        """
+        try:
+            viewer.window._qt_viewer.canvas.native.setFocus()
+        except Exception:
+            pass
+
+    def _do_save():
+        if curr_file is None:
+            print("  Save not available here (no file to save into).")
+            return
+        print("  Saving current labels.")
+        _save_now()
+
+    def _do_relabel():
+        print("  Relabeling by root/shoot lines.")
+        labels_layer.data = relabel_by_rootshootlines(labels_layer.data)
+
+    def _do_jump():
+        """Ask for a sample number and signal the caller to jump there."""
+        from qtpy.QtWidgets import QInputDialog
+        num, ok = QInputDialog.getInt(
+            qt_window, "Jump to sample",
+            "Sample number (1-based):", 1, 1, 999999, 1)
+        if not ok:
+            print("  Jump cancelled.")
+            return
+        print(f"  Requesting jump to sample {num} (without saving).")
+        return_requests['go_to'] = num
+        save_on_close[0] = False
+        viewer.close()
+
+    def _do_next():
+        print("  Closing without saving, moving to next file.")
+        save_on_close[0] = False
+        viewer.close()
+
+    def _do_quit():
+        print("  Closing without saving, quitting loop.")
+        return_requests['quitloop_flag'] = True
+        save_on_close[0] = False
+        viewer.close()
+
+    def _at_mouse(correct_fn, key):
+        """
+        Run one of the line-drawing corrections at the current mouse position.
+
+        The shift widget's offset is taken back out of the world position, so
+        the correction lands where the *image* is being pointed at rather than
+        where the (untranslated) labels layer happens to sit.
+        """
+        mouse_pos = viewer.cursor.position
+        mouse_row, mouse_col = int(round(mouse_pos[-2])), int(round(mouse_pos[-1]))
+        row = mouse_row - shift_widget.shift_y.value
+        col = mouse_col - shift_widget.shift_x.value
+        print(f"  '{key}' pressed at world ({mouse_row}, {mouse_col}) "
+              f"-> label position ({row}, {col})")
+        labels_layer.data = correct_fn(labels_layer.data, row, col)
+
+    # (key, caption, callback, gets a button). No button for the two actions
+    # that read `viewer.cursor.position`: clicking a button in the dock takes
+    # the pointer off the canvas, where that position stops updating, so the
+    # correction would land wherever the mouse last crossed the canvas edge.
+    # Those two are advertised in the info box instead.
+    ACTIONS = [
+        ('r', "Draw root/shoot line",
+         lambda: _at_mouse(correct_mask_rootshootline, 'r'), False),
+        ('t', "Draw through-line",
+         lambda: _at_mouse(correct_mask_throughline, 't'), False),
+        ('u', "Relabel by lines", _do_relabel, True),
+        ('w', "Save now", _do_save, curr_file is not None),
+        ('j', "Jump to sample", _do_jump, True),
+        ('n', "Next file, no save", _do_next, True),
+        ('q', "Quit, no save", _do_quit, True),
+    ]
+
+    action_buttons = {}
+    for _key, _caption, _callback, _has_button in ACTIONS:
+        viewer.bind_key(_key)(lambda _viewer, fn=_callback: fn())
+        if _has_button:
+            _button = PushButton(text=f"{_caption} [{_key}]")
+            _button.changed.connect(
+                lambda *_, fn=_callback: (fn(), _focus_canvas()))
+            action_buttons[_key] = _button
+
+    # The info box carries what the buttons cannot: the keys that need a mouse
+    # position. Everything else is self-documenting, since each button caption
+    # ends in its own key.
+    mouse_actions = [(k, c) for k, c, _, has_button in ACTIONS if not has_button]
+    info_box = Label(value=(
+        "<b>Hover over the plant, then press:</b><br>" +
+        "<br>".join(f"&nbsp;&nbsp;<b>{k}</b> &mdash; {c.lower()}"
+                    for k, c in mouse_actions)))
+    info_box.native.setWordWrap(True)
+
+    print("____\nStarting Napari editor window\n===\n"
+          "Buttons in the Tools panel show their shortcut in [].\n"
+          "These have no button — hover over the plant and press:\n" +
+          "\n".join(f"  {k} = {c.lower()}" for k, c in mouse_actions) +
+          "\n____")
+
+    # ----- assemble the tools panel -------------------------------------------
+    # Info box on top as a legend, then the mask tools, then (further below) the
+    # ones that leave this plate.
+    tool_widgets = [info_box, shift_widget, remove_small_widget,
+                    remove_large_widget, action_buttons['u']]
+
     # Saving from within the viewer is only possible when curr_file was given;
     # otherwise the button is omitted and the caller saves what we return.
-    tool_widgets = [shift_widget, remove_small_widget, remove_large_widget]
     if curr_file is not None:
-        @magicgui(call_button="Save now")
-        def save_widget():
-            _save_now()
-        tool_widgets.append(save_widget)
+        tool_widgets.append(action_buttons['w'])
 
     # ----- widget: save and reopen the same plate -----------------------------
     # After dragging the rectangle, this is how you see what it did: saving and
@@ -698,6 +821,21 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     tool_widgets += plnapana.make_analysis_widgets(
         viewer,
         lambda: plprep.apply_mask_rect(labels_layer.data, _rect_from_layer()))
+
+    # ----- navigation buttons, side by side at the bottom ---------------------
+    # These three all close the viewer, so they are kept together and away from
+    # the editing tools above.
+    tool_widgets.append(Container(
+        layout='horizontal', labels=False,
+        widgets=[action_buttons[k] for k in ('j', 'n', 'q')]))
+
+    # ----- keep the keyboard working after clicking ---------------------------
+    # The action buttons restore canvas focus themselves (see the loop above);
+    # the magicgui ones are hooked here via their `called` signal, so that no
+    # button leaves focus behind in the dock where the shortcuts don't reach.
+    for _widget in tool_widgets:
+        if hasattr(_widget, 'called'):
+            _widget.called.connect(lambda *_: _focus_canvas())
 
     # ----- dock widgets as a single stacked panel ------------------------------
     tools_container = Container(widgets=tool_widgets)
@@ -734,7 +872,7 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
         except Exception as e:
             print(f"  Warning: could not snapshot session state: {e}")
 
-    qt_window = viewer.window._qt_window
+    # (qt_window was grabbed above, where the actions are defined)
     _original_close_event = qt_window.closeEvent
 
     def _close_event_with_snapshot(event):
@@ -742,102 +880,6 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
         _original_close_event(event)
 
     qt_window.closeEvent = _close_event_with_snapshot
-
-    # ----- keybinding: q = quit without saving --------------------------------
-    @viewer.bind_key('q')
-    def _quit_without_saving(viewer):
-        """Close viewer without saving, and signal to quit the loop."""
-        print("  'q' pressed — closing without saving, quitting loop.")
-        return_requests['quitloop_flag'] = True
-        save_on_close[0] = False
-        viewer.close()
-    
-    # ----- keybinding: n = next file without saving ---------------------------
-    @viewer.bind_key('n')
-    def _next_without_saving(viewer):
-        """Close viewer without saving, continue to the next file."""
-        print("  'n' pressed — closing without saving, moving to next file.")
-        save_on_close[0] = False
-        viewer.close()
-    
-    # ----- keybinding: r = draw root/shoot boundary line -----------------------
-    @viewer.bind_key('r')
-    def _run_custom_action(viewer):
-        """Draw a horizontal red line (label=5) at the root/shoot boundary."""
-        # Get the current mouse position in world coordinates
-        mouse_pos = viewer.cursor.position
-        mouse_row = int(round(mouse_pos[-2]))
-        mouse_col = int(round(mouse_pos[-1]))
-        print(f"  'r' pressed at world position ({mouse_row}, {mouse_col})")
-
-        # Subtract the image shift to get the correct label-layer position
-        row = mouse_row - shift_widget.shift_y.value
-        col = mouse_col - shift_widget.shift_x.value
-        print(f"  Mapped to label position ({row}, {col})")
-
-        # Call the standalone function
-        mask = labels_layer.data
-        mask = correct_mask_rootshootline(mask, row, col)
-
-        # Refresh the labels layer
-        labels_layer.data = mask
-    
-    # ----- keybinding: t = draw through-line ----------------------------------
-    @viewer.bind_key('t')
-    def _run_throughline_action(viewer):
-        """Draw a line (label=5) through the seed from bg1 to bg2."""
-        # Get the current mouse position in world coordinates
-        mouse_pos = viewer.cursor.position
-        mouse_row = int(round(mouse_pos[-2]))
-        mouse_col = int(round(mouse_pos[-1]))
-        print(f"  't' pressed at world position ({mouse_row}, {mouse_col})")
-
-        # Subtract the image shift to get the correct label-layer position
-        row = mouse_row - shift_widget.shift_y.value
-        col = mouse_col - shift_widget.shift_x.value
-        print(f"  Mapped to label position ({row}, {col})")
-
-        # Call the standalone function
-        mask = labels_layer.data
-        mask = correct_mask_throughline(mask, row, col)
-
-        # Refresh the labels layer
-        labels_layer.data = mask
-    
-    # ----- keybinding: u = relabel by root/shoot lines ------------------------
-    @viewer.bind_key('u')
-    def _run_relabel_action(viewer):
-        """Relabel plant regions as shoot/root based on red lines."""
-        print("  'u' pressed — relabeling by root/shoot lines.")
-        mask = labels_layer.data
-        mask = relabel_by_rootshootlines(mask)
-        labels_layer.data = mask
-
-    # ----- keybinding: w = save current labels to disk ------------------------
-    @viewer.bind_key('w')
-    def _run_save_action(viewer):
-        """Save the current labels layer to the .npz file (if curr_file given)."""
-        if curr_file is None:
-            print("  'w' pressed — Save function NOT available now.")
-            return
-        print("  'w' pressed — saving current labels.")
-        _save_now()
-
-    # ----- keybinding: j = jump to a specific sample --------------------------
-    @viewer.bind_key('j')
-    def _run_jump_action(viewer):
-        """Ask for a sample number and signal the caller to jump there."""
-        from qtpy.QtWidgets import QInputDialog
-        num, ok = QInputDialog.getInt(
-            qt_window, "Jump to sample",
-            "Sample number (1-based):", 1, 1, 999999, 1)
-        if not ok:
-            print("  'j' pressed — jump cancelled.")
-            return
-        print(f"  'j' pressed — requesting jump to sample {num} (without saving).")
-        return_requests['go_to'] = num
-        save_on_close[0] = False
-        viewer.close()
 
     # Run napari (blocks until the viewer is closed)
     napari.run()

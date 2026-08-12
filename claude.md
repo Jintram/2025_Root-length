@@ -165,6 +165,18 @@ stored parameter `prepr_info` in the segfile contains the cropping information.
   `napari_analysis.LAST_CONFIG` (not in `EditorSessionState`, which cannot be
   read at closing time), updated on every widget change, so they carry over to
   the next file of a session.
+- Every action of the napari editor is declared once in the `ACTIONS` table in
+  `edit_annotation_napari` — `(key, caption, callback, gets a button)` — which
+  is what builds the keybindings, the buttons and the help text, so add new
+  actions there rather than writing a `@viewer.bind_key` by hand. Buttons are
+  captioned `"Caption [k]"`, so each one advertises its own shortcut.
+  The two mouse-position actions ('r', 't') deliberately have no button:
+  clicking in the dock takes the pointer off the canvas, and
+  `viewer.cursor.position` then holds wherever the mouse last crossed the canvas
+  edge. They are advertised in an info box (a `magicgui` `Label` with HTML) at
+  the top of the Tools panel instead. Every button hands keyboard focus back to
+  the canvas when it is done (`_focus_canvas`), otherwise focus stays in a
+  spinbox and the shortcuts appear to stop working.
 
 
 ---

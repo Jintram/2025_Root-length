@@ -144,7 +144,7 @@ def make_analysis_widgets(viewer, get_labels):
         shared_skeleton_flag={
             "value": LAST_CONFIG.shared_skeleton_flag,
             "label": "Shared root+shoot skeleton"},
-        call_button="Analyze plate (takes a while)",
+        call_button="Preview analysis result",
     )
     def analyze_widget(smoothing_diskradius: int, dilation_radius_maximum: int,
                        shared_skeleton_flag: bool):
