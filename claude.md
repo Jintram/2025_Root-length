@@ -27,8 +27,14 @@ important ones are root and shoot length.
     read the directory structure into a dataframe.
     - [edit_segfiles](root_length/functions_pipeline/edit_segfiles.py) the function `edit_all_segfiles` and 
     its helpers allows looping over files (using napari), to correct the segmentation masks.
+        - [napari_analysis](root_length/functions_pipeline/napari_analysis.py) adds the "Analyze plate"
+        widget to that editor: it runs `analyze_plate.analyze_labels` on the labels currently on screen
+        and shows the result as `analysis: ...` layers. Kept out of `edit_segfiles` to keep that file
+        about editing (and because it imports the analysis side of the package).
     - [analyze_plate](root_length/functions_pipeline/analyze_plate.py), `analyze_plate.py` analyzes the 
-    segmentation masks. this file makes use of the following functionality:
+    segmentation masks. `analyze_labels` does the measuring on an in-memory label image, `analyze_plate`
+    wraps file loading, the overview plot and the .tsv around it. This file makes use of the following
+    functionality:
         - [preprocessing](root_length/functions_pipeline/preprocessing.py), as name says contains pre-processing 
         functions. E.g. identify plants and clean the mask.
         - [determine_length](root_length/functions_pipeline/determine_length.py), offers functionality
@@ -150,6 +156,12 @@ stored parameter `prepr_info` in the segfile contains the cropping information.
     it with 3 positional arguments and unpacks 2 return values. Scripts must
     pass `edit_annotation_napari_cheekycells`, the adapter that keeps that
     older shape; drop it once cheeky_cells is updated.
+- The editor's "Analyze plate" button measures the labels *on screen*, cropped
+  to the rectangle as it is at that moment (so unlike the rest of the editor it
+  does not need a reload after dragging), and never touches disk: no .tsv and no
+  plot are written, and unsaved edits are measured as they are. It blocks the
+  viewer while running, on purpose — a worker thread would let the labels be
+  edited halfway through measuring them.
 
 
 ---

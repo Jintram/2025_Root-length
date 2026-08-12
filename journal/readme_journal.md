@@ -79,6 +79,13 @@ current 1st file:
 
 - [X] (Added phase 3 walkthrough for cheeky_cells in that repository)
 
+- [ ] Implementation of a feature to directly show analysis result
+    - To do after Claude:
+        - [ ] project_results_to_full_image should be maintained, but 
+        it should NOT plot the plant mask (already done), instead it should
+        plot the tissue-specific skeletons only. 
+        (plus their sizes in an annotation label)
+
 - [ ] Implement way to combine multiple labels and distill separate skeletons 
 afterwards.
     - [X] Use Claude Code to implement changes.

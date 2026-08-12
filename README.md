@@ -31,6 +31,7 @@ The image below shows the segmentation of the plants:
 <img src="figures/example_plant_segmentation.png" width=50%>
 
 The image below shows the length measurement of a plant:
+<img src="figures/screenshot_plant-analysis.png" width=50%>
 
 
 **Image description:** *White is the root, green is the shoot, brown is the seed, and dark green are leaves (as determined by 
@@ -144,10 +145,5 @@ Graph:
 # Potential things to improve
 
 - Improve the cropping procedure (use another ML model to detect foreground/background?)
-- Make it such that the user can see the results "live" on the plants while
-performing edits.
-    - This would not be super hard, as there can probably be a button in the
-    napari gui that calls the plant analysis and creates a projection layer
-    with the lengths (outline + highlighting it)
 
 

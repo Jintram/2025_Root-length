@@ -802,6 +802,45 @@ def plot_distance_graph(sample: TissueSample):
 
 # %%
 
+def project_results_to_full_image(plant_results, shape: tuple[int, int]) -> np.ndarray:
+    """
+    Paste the traced centerlines of all plants back into one full-image array.
+
+    Values are 1 = skeleton, 2 = root centerline, 3 = shoot centerline, written
+    in that order so the measured centerlines end up on top of the skeleton they
+    were taken from. Used to show the result as a napari label layer;
+    `plot_all_plants_projected` draws the same information with matplotlib.
+    
+    Note that "skeleton" here refers to the original skeleton, which also 
+    contains side-branches that are later pruned from root and shoot 
+    centerline using the longest path algorithm.
+    """
+
+    projected = np.zeros(shape, dtype=np.uint8)
+
+    for plant in plant_results:
+
+        if plant is None or plant.bbox is None:
+            continue
+
+        # show the shared root+shoot skeleton where it is available
+        skeleton_to_plot = plant.root.skeleton
+        if plant.combined is not None and plant.combined.skeleton is not None:
+            skeleton_to_plot = plant.combined.skeleton
+
+        # the per-plant masks live in bbox coordinates, so write into that view
+        minr, minc, maxr, maxc = plant.bbox
+        bbox_view = projected[minr:maxr, minc:maxc]
+        for value, tissue_mask in ((1, skeleton_to_plot),
+                                   (2, plant.root.mask_longest_path),
+                                   (3, plant.shoot.mask_longest_path)):
+            if tissue_mask is not None:
+                bbox_view[np.asarray(tissue_mask) > 0] = value
+
+    return projected
+
+# %%
+
 def plot_all_plants_projected(
         sample_image: np.ndarray,
         plant_results,
@@ -951,6 +990,9 @@ def run_default_length_pipeline(plant: PlantSample,
     if config_pipeline.shared_skeleton_flag:
         plant = prepare_shared_skeleton(plant=plant,
                                         config_pipeline=config_pipeline)
+    else:
+        # switched off, so there is no shared skeleton to split below either
+        plant.nosharedskeleton_flag = True
 
     # Generate tissue-specific skeletons
     if plant.nosharedskeleton_flag:

@@ -37,6 +37,8 @@ import root_length.functions_pipeline.preprocessing_seg as plprep_seg
     # import importlib; importlib.reload(plprep_seg)
 import root_length.functions_pipeline.preprocessing as plprep
     # import importlib; importlib.reload(plprep)
+import root_length.functions_pipeline.napari_analysis as plnapana
+    # import importlib; importlib.reload(plnapana)
 
 import skimage.io as skio
 from skimage.draw import line
@@ -512,6 +514,10 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     new rect. It is a jump to the current sample, so it needs a caller that
     acts on 'go_to' and a `curr_file.file_idx` (ie `edit_all_segfiles`).
 
+    The tools panel also holds the "Analyze plate" button (see
+    `napari_analysis`), which measures the labels as they are on screen and
+    draws the result in extra `analysis: ...` layers. Nothing is saved by it.
+
     # Note to self, already used by Napari:
     1, 2, 3, 4, 5, 6, 7, 8, 9, 0, [, ], -, =, a, d, e, f, i, l, m, p, s, v, z
     # Used by this function: q, n, r, t, u, w, j
@@ -683,6 +689,15 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
             return_requests['go_to'] = curr_file.file_idx + 1
             viewer.close()
         tool_widgets.append(reload_widget)
+
+    # ----- widgets: measure the current labels --------------------------------
+    # Built by `napari_analysis`, which keeps the analysis (and its settings and
+    # result layers) out of this file. It is handed the labels as they are on
+    # screen, cropped to the rectangle as it is *now* rather than as it was on
+    # opening, so that a dragged rectangle takes effect without a reload.
+    tool_widgets += plnapana.make_analysis_widgets(
+        viewer,
+        lambda: plprep.apply_mask_rect(labels_layer.data, _rect_from_layer()))
 
     # ----- dock widgets as a single stacked panel ------------------------------
     tools_container = Container(widgets=tool_widgets)

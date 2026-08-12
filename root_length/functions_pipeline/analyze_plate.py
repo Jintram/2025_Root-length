@@ -57,23 +57,15 @@ def identify_plants(img_mask_clean):
 
 # %%
 
-def analyze_plate(curr_file, config_pipeline):
-    # segfile_path = "/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/SEGMENTATION/202602/segfiles/20250520/20250520_OY03.npz"
+def analyze_labels(img_mask, config_pipeline):
+    """
+    Measure all plants in a label image, without touching disk.
 
-    # Load input
-    segfile_data = np.load(curr_file.fullpath)
-    img_mask = segfile_data['img_pred_lbls']
-
-    # Discard labels outside the plate area, if one was stored by
-    # `edit_segfiles.compute_and_save_mask_rect_all` or drawn in napari.
-    # Applied here (before anything else) so that the plant selection, the
-    # output table and the overview plot below all see the same mask.
-    if config_pipeline.apply_mask_rect and ('mask_rect' in segfile_data.files):
-        mask_rect = plprep.normalize_rect(segfile_data['mask_rect'], img_mask.shape)
-        n_labeled_before = np.count_nonzero(img_mask)
-        img_mask = plprep.apply_mask_rect(img_mask, mask_rect)
-        print(f"Applied mask_rect {mask_rect}: dropped "
-              f"{n_labeled_before - np.count_nonzero(img_mask)} labeled pixels.")
+    Returns `(img_mask_clean, plant_results)`. Split off from `analyze_plate` so
+    that the napari editor can measure the labels it currently has on screen
+    (see `napari_analysis`); `analyze_plate` wraps the file loading, the overview
+    plot and the .tsv around it.
+    """
 
     # Clean the mask
     img_mask_clean = plprep.clean_mask(img_mask)
@@ -134,6 +126,32 @@ def analyze_plate(curr_file, config_pipeline):
         
         if current_sample_all_plants[i] is None:
             print("^ FAILED")
+
+    return img_mask_clean, current_sample_all_plants
+
+# %%
+
+def analyze_plate(curr_file, config_pipeline):
+    # segfile_path = "/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/SEGMENTATION/202602/segfiles/20250520/20250520_OY03.npz"
+
+    # Load input
+    segfile_data = np.load(curr_file.fullpath)
+    img_mask = segfile_data['img_pred_lbls']
+
+    # Discard labels outside the plate area, if one was stored by
+    # `edit_segfiles.compute_and_save_mask_rect_all` or drawn in napari.
+    # Applied here (before anything else) so that the plant selection, the
+    # output table and the overview plot below all see the same mask.
+    if config_pipeline.apply_mask_rect and ('mask_rect' in segfile_data.files):
+        mask_rect = plprep.normalize_rect(segfile_data['mask_rect'], img_mask.shape)
+        n_labeled_before = np.count_nonzero(img_mask)
+        img_mask = plprep.apply_mask_rect(img_mask, mask_rect)
+        print(f"Applied mask_rect {mask_rect}: dropped "
+              f"{n_labeled_before - np.count_nonzero(img_mask)} labeled pixels.")
+
+    # Do the actual work
+    img_mask_clean, current_sample_all_plants = \
+        analyze_labels(img_mask, config_pipeline=config_pipeline)
 
     # preparing output
     output_dir_plot = os.path.join(curr_file.outputdir, 'lenplots/', curr_file.subdir)
