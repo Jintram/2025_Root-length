@@ -21,9 +21,17 @@ conda activate 2025_IMG
 Color images of plants were taken using a scanner (a basic consumer model), with the aim of determining root lenghts
 from these color pictures.
 
-At this analysis stage, a set of scripts have already segmented images of roots. The image below shows an overlay both of segmentation and original picture of the plants.
+The scripts here 
 
+1. Uses machine learning scripts (from the package [Cheeky-cells](https://github.com/Jintram/Cheeky-cells/), a set of scripts that allow training and 
+segmenting of images) to segment the plant images.
+2. Use segmentation files as input to determine the length of each plant.
+
+The image below shows the segmentation of the plants:
 <img src="figures/example_plant_segmentation.png" width=50%>
+
+The image below shows the length measurement of a plant:
+
 
 **Image description:** *White is the root, green is the shoot, brown is the seed, and dark green are leaves (as determined by 
 the segmentation).*
@@ -129,5 +137,17 @@ Graph:
 
 
 
+
+
+
+
+# Potential things to improve
+
+- Improve the cropping procedure (use another ML model to detect foreground/background?)
+- Make it such that the user can see the results "live" on the plants while
+performing edits.
+    - This would not be super hard, as there can probably be a button in the
+    napari gui that calls the plant analysis and creates a projection layer
+    with the lengths (outline + highlighting it)
 
 

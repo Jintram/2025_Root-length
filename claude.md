@@ -35,6 +35,9 @@ important ones are root and shoot length.
         to (using skeletonization and graph representation) find the root lengths. 
         - [determine_length_moreplots](root_length/functions_pipeline/determine_length_moreplots.py), placeholder,
         currently only has imports, but more plotting functionalities could be added here.
+        - [config](root_length/functions_pipeline/config.py) holds the `ConfigPipeline` dataclass with all
+        pipeline settings. Its own module so `analyze_plate` and `determine_length` can both import it
+        without importing each other.
     - [preprocessing_seg](root_length/functions_pipeline/preprocessing_seg.py), offers additional preprocessing
     functionality. This is a separate file as these functions can also be plugged directly into another repository
     that does the segmentation itself. [preprocessing.py](root_length/functions_pipeline/preprocessing.py) only

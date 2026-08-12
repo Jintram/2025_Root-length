@@ -1,7 +1,8 @@
 # %% ###########################################################################
 
 # Segments arabidopsis root/shoot dataset
-
+# 
+# This file uses the code in "cheeky_cells" to segment a test set of plants.
 
 # %% ###########################################################################
 # Libraries
@@ -57,29 +58,3 @@ o3.segment_all_files(config3_ara_root,
                      overwrite_files=True
                      )
 
-
-# %%
-# DEBUGGING
-
-if False:
-    
-    # Given a filename (e.g. 20250620_OY_06), find index in the df_metadata_input
-    np.where(df_metadata_input.loc[:,'filename'].str.contains('20250617_OY_17'))
-    np.where(df_metadata_input.loc[:,'filename'].str.contains('20250617_OY_15'))
-    
-
-
-# %% 
-
-# REMOVE THIS CODE
-
-# import os
-# for file_idx in range(452, 1000):
-#     print(f"Processing file idx {file_idx} ..")
-#     filepath_segfile = \
-#         os.path.join(config.segmentation_dir, "segfiles/", 
-#                         df_metadata_input.loc[file_idx, 'subdir'], 
-#                         f'segfile_idx{file_idx:03d}.npz')
-#     # remove filepath_segfile if it's there
-#     if os.path.exists(filepath_segfile):
-#         os.remove(filepath_segfile)

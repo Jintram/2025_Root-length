@@ -74,16 +74,16 @@ pledit.edit_all_segfiles(df_filelist=df_filelist,
 # %% Run the analysis
 # import importlib; importlib.reload(plap)
 
-
-from root_length.functions_pipeline.determine_length import ConfigPipeline
-    # import importlib; importlib.reload(ConfigPipeline)
+from root_length.functions_pipeline.config import ConfigPipeline
+    # import importlib; importlib.reload(determine_length)
 
 # Set configuration parameters
 config_pipeline = \
     ConfigPipeline(
         # Smooths the root/shoots to avoid spurious branching
         smoothing_diskradius=5,
-        dilation_radius_maximum=15
+        dilation_radius_maximum=15,
+        dpi_plots=1200
         )
 
 # test run
@@ -100,18 +100,3 @@ plap.analyze_all_plates(df_filelist=df_filelist,
 plap.generate_df_all(df_filelist, DIR_OUTPUTFILES)
 
 
-
-
-
-# %% misc code
-
-# find plant with id 250502_OY_09
-matching_idx = df_filelist.index[df_filelist["filename"].str.contains("250502_OY_09", na=False)]
-print(matching_idx.tolist())
-
-
-
-# checking out a sample, and why it doesn't have a rect?
-import numpy as np
-filepath = "/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/202602/SEG/segfiles/20250611/20250617_OY_15_seg.npz"
-test2=np.load(filepath)

@@ -28,6 +28,7 @@ import root_length.functions_pipeline.determine_length as pllen
     # import importlib; importlib.reload(pllen)
 import root_length.functions_files.filelisting as ffl
     # import importlib; importlib.reload(ffl)
+from root_length.functions_pipeline.config import ConfigPipeline
     
 
 ################################################################################
@@ -146,8 +147,12 @@ def analyze_plate(curr_file, config_pipeline):
                 sample_image = img_mask,
                 plant_results = current_sample_all_plants)
     # and save
-    fig.savefig(os.path.join(
-        output_dir_plot, curr_file.filebasename + "_all-plants-projected.pdf"))
+    fig.savefig(
+        os.path.join(
+            output_dir_plot, curr_file.filebasename + "_all-plants-projected.pdf"
+        ),
+        dpi = config_pipeline.dpi_plots
+    )
     plt.close(fig)
     
     # moreover, save the data to a .csv file
@@ -180,7 +185,7 @@ def analyze_plate(curr_file, config_pipeline):
 def analyze_all_plates(df_filelist, output_dir, config_pipeline=None):
     
     if config_pipeline is None:
-        config_pipeline = pllen.ConfigPipeline()
+        config_pipeline = ConfigPipeline()
 
     time_taken = []
     for file_idx in range(len(df_filelist)):

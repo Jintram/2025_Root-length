@@ -26,6 +26,7 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import ListedColormap
 
 import root_length.functions_pipeline.utils as plutils
+from root_length.functions_pipeline.config import ConfigPipeline
 
 # Sums the 8 neighbors around one pixel
 KERNEL_NEIGHBOR_COUNT = np.array(
@@ -73,16 +74,6 @@ class TissueSample:
     total_length_px_bynx: float | None = None
     length_mm: float | None = None
     
-@dataclass
-class ConfigPipeline:
-    smoothing_diskradius: int | None = None
-    # derive root and shoot centerlines from one shared skeleton
-    shared_skeleton_flag: bool = True
-    # largest dilation radius allowed to bridge holes in the root+shoot mask
-    dilation_radius_maximum: int = 15
-    # ignore labels outside the stored plate area (`mask_rect`) when loading
-    apply_mask_rect: bool = True
-
 @dataclass
 class PlantSample:
     """Container for one whole plant: a root + a shoot + plant-level metadata."""

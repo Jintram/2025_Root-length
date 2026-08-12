@@ -68,15 +68,16 @@ CONTINUE HERE
 CONTINUE WITH MAKING A "WALK-THROUGH" OF THE CODE, USING PY FILES IN:
 projects/20260621_highresmodel-crop-TESTSET
 
-CAN FIRST DO SEGMENTATION AND THEN THE LENGTH ANALYSIS (two different py files)
-
-(END CONTINUE HERE)
+current 1st file:
+20250530_OY_09_all-plants-projected.pdf
 
 **
 
 - [ ] See previous entries
     - [X] (better skeleton at tissue-tissue boundaries)
-    - [ ] (cropping)
+    - [ ] (further improve cropping? -- ship first, do this later)
+
+- [X] (Added phase 3 walkthrough for cheeky_cells in that repository)
 
 - [ ] Implement way to combine multiple labels and distill separate skeletons 
 afterwards.
