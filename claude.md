@@ -161,7 +161,10 @@ stored parameter `prepr_info` in the segfile contains the cropping information.
   does not need a reload after dragging), and never touches disk: no .tsv and no
   plot are written, and unsaved edits are measured as they are. It blocks the
   viewer while running, on purpose — a worker thread would let the labels be
-  edited halfway through measuring them.
+  edited halfway through measuring them. Its settings live in
+  `napari_analysis.LAST_CONFIG` (not in `EditorSessionState`, which cannot be
+  read at closing time), updated on every widget change, so they carry over to
+  the next file of a session.
 
 
 ---

@@ -149,14 +149,6 @@ def make_analysis_widgets(viewer, get_labels):
     def analyze_widget(smoothing_diskradius: int, dilation_radius_maximum: int,
                        shared_skeleton_flag: bool):
 
-        # remembered for the next plate; `apply_mask_rect` is not part of this,
-        # since here the cropping already happened in `get_labels`
-        global LAST_CONFIG
-        LAST_CONFIG = ConfigPipeline(
-            smoothing_diskradius=smoothing_diskradius or None,
-            shared_skeleton_flag=shared_skeleton_flag,
-            dilation_radius_maximum=dilation_radius_maximum)
-
         # The viewer is frozen for as long as this runs (seconds to a minute),
         # so the prints of the pipeline are the only sign of life. Doing it in a
         # worker thread instead would mean the labels can be edited halfway
@@ -173,5 +165,26 @@ def make_analysis_widgets(viewer, get_labels):
         add_analysis_layers(viewer, plant_results, img_mask.shape)
         print(f"  Analyzed {len(plant_results)} plants; "
               "showing them in the 'analysis: ...' layers.\n____")
+
+    def _remember_settings(*_):
+        """
+        Copy the widget values into `LAST_CONFIG`, which is where they are read
+        from: both by the button below and by the next viewer that opens.
+
+        Hooked on every change rather than on pressing the button, so a setting
+        that is dialed in and then not used is still there for the next plate.
+        Reading the widgets when the window closes is not an option: Qt has
+        deleted them by then (see the snapshot dance in `edit_segfiles`).
+
+        `apply_mask_rect` is left at its default, since here the cropping
+        already happened in `get_labels`.
+        """
+        global LAST_CONFIG
+        LAST_CONFIG = ConfigPipeline(
+            smoothing_diskradius=analyze_widget.smoothing_diskradius.value or None,
+            shared_skeleton_flag=analyze_widget.shared_skeleton_flag.value,
+            dilation_radius_maximum=analyze_widget.dilation_radius_maximum.value)
+
+    analyze_widget.changed.connect(_remember_settings)
 
     return [analyze_widget]
