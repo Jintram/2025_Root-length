@@ -65,11 +65,18 @@ these two training sets could be combined.
 
 CONTINUE HERE
 
-CONTINUE WITH MAKING A "WALK-THROUGH" OF THE CODE, USING PY FILES IN:
+CONTINUE WITH 
+
+(1) test run the napari updates
+    (1b) maybe also re-organize the button and text positions..
+    (1c) !!! git merge into main!!!! <----------------------------------------------
+(2) MAKING A "WALK-THROUGH" OF THE CODE, USING PY FILES IN:
 projects/20260621_highresmodel-crop-TESTSET
 
 current 1st file:
 20250530_OY_09_all-plants-projected.pdf
+
+(previously created some additional featuers in the napari GUI)
 
 **
 

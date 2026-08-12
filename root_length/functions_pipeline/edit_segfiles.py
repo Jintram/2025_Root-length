@@ -16,6 +16,10 @@ Keybindings (also listed in the editor's Tools panel):
 
 Everything except r and t also has a button in the Tools panel, captioned with
 its key; see the `ACTIONS` table in `edit_annotation_napari`.
+
+Closing the window (Cmd+W / Ctrl+W, or the close button) is napari's own
+shortcut and is not in that table, but it does save the current labels and
+continue with the next file — unlike 'n', which skips without saving.
 """
 
 
@@ -521,8 +525,10 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     new rect. It is a jump to the current sample, so it needs a caller that
     acts on 'go_to' and a `curr_file.file_idx` (ie `edit_all_segfiles`).
 
-    The tools panel also holds the "Analyze plate" button (see
-    `napari_analysis`), which measures the labels as they are on screen and
+    The tools panel groups widgets that belong together into titled QGroupBoxes:
+    "Improve segmentation" (the size filters and the relabel button) and
+    "Analysis preview" (the analysis settings and their button). The latter is
+    built by `napari_analysis`; it measures the labels as they are on screen and
     draws the result in extra `analysis: ...` layers. Nothing is saved by it.
 
     Every action of this editor is declared once in the `ACTIONS` table below,
@@ -752,20 +758,24 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     # the pointer off the canvas, where that position stops updating, so the
     # correction would land wherever the mouse last crossed the canvas edge.
     # Those two are advertised in the info box instead.
+    # `needs_mouse` is what puts an action in the info box, and is deliberately
+    # not the same test as "has no button": with curr_file=None, 'w' also has no
+    # button, but telling the user to hover over a plant and press it would be
+    # nonsense (it only prints that saving is unavailable).
     ACTIONS = [
         ('r', "Draw root/shoot line",
-         lambda: _at_mouse(correct_mask_rootshootline, 'r'), False),
+         lambda: _at_mouse(correct_mask_rootshootline, 'r'), False, True),
         ('t', "Draw through-line",
-         lambda: _at_mouse(correct_mask_throughline, 't'), False),
-        ('u', "Relabel by lines", _do_relabel, True),
-        ('w', "Save now", _do_save, curr_file is not None),
-        ('j', "Jump to sample", _do_jump, True),
-        ('n', "Next file, no save", _do_next, True),
-        ('q', "Quit, no save", _do_quit, True),
+         lambda: _at_mouse(correct_mask_throughline, 't'), False, True),
+        ('u', "Relabel by lines", _do_relabel, True, False),
+        ('w', "Save now", _do_save, curr_file is not None, False),
+        ('j', "Jump to sample", _do_jump, True, False),
+        ('n', "Next file, no save", _do_next, True, False),
+        ('q', "Quit, no save", _do_quit, True, False),
     ]
 
     action_buttons = {}
-    for _key, _caption, _callback, _has_button in ACTIONS:
+    for _key, _caption, _callback, _has_button, _ in ACTIONS:
         viewer.bind_key(_key)(lambda _viewer, fn=_callback: fn())
         if _has_button:
             _button = PushButton(text=f"{_caption} [{_key}]")
@@ -775,75 +785,109 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
 
     # The info box carries what the buttons cannot: the keys that need a mouse
     # position. Everything else is self-documenting, since each button caption
-    # ends in its own key.
-    mouse_actions = [(k, c) for k, c, _, has_button in ACTIONS if not has_button]
+    # ends in its own key. Closing the window is napari's own shortcut rather
+    # than one of ours, but it is how a session actually moves along (nothing
+    # sets `save_on_close` to False, so the labels are written and the loop goes
+    # on), and it is worth spelling out next to the 'n' button that does the
+    # opposite.
+    mouse_actions = [(k, c) for k, c, _, _, needs_mouse in ACTIONS if needs_mouse]
+    close_note = ("Cmd+W / Ctrl+W (or the window close button) "
+                  "= save and go to the next plate")
     info_box = Label(value=(
         "<b>Hover over the plant, then press:</b><br>" +
         "<br>".join(f"&nbsp;&nbsp;<b>{k}</b> &mdash; {c.lower()}"
-                    for k, c in mouse_actions)))
+                    for k, c in mouse_actions) +
+        "<br><b>Cmd+W / Ctrl+W</b> (or the window close button)<br>"
+        "&nbsp;&nbsp;&mdash; save and go to the next plate"))
     info_box.native.setWordWrap(True)
 
     print("____\nStarting Napari editor window\n===\n"
           "Buttons in the Tools panel show their shortcut in [].\n"
           "These have no button — hover over the plant and press:\n" +
           "\n".join(f"  {k} = {c.lower()}" for k, c in mouse_actions) +
-          "\n____")
-
-    # ----- assemble the tools panel -------------------------------------------
-    # Info box on top as a legend, then the mask tools, then (further below) the
-    # ones that leave this plate.
-    tool_widgets = [info_box, shift_widget, remove_small_widget,
-                    remove_large_widget, action_buttons['u']]
-
-    # Saving from within the viewer is only possible when curr_file was given;
-    # otherwise the button is omitted and the caller saves what we return.
-    if curr_file is not None:
-        tool_widgets.append(action_buttons['w'])
+          f"\n{close_note}\n____")
 
     # ----- widget: save and reopen the same plate -----------------------------
     # After dragging the rectangle, this is how you see what it did: saving and
     # reopening re-runs the load-time filtering with the new rect. Implemented
     # as a jump to the current sample, so it only works via the file loop that
     # handles 'go_to' (ie edit_all_segfiles, which sets file_idx).
+    reload_widget = None
     if (curr_file is not None) and (getattr(curr_file, 'file_idx', None) is not None):
-        @magicgui(call_button="Save + reload plate")
+        @magicgui(call_button="Save + reload plate (e.g. after adjusting rect)")
         def reload_widget():
             print("  Reload pressed — saving and reopening this plate.")
             return_requests['go_to'] = curr_file.file_idx + 1
             viewer.close()
-        tool_widgets.append(reload_widget)
 
     # ----- widgets: measure the current labels --------------------------------
     # Built by `napari_analysis`, which keeps the analysis (and its settings and
     # result layers) out of this file. It is handed the labels as they are on
     # screen, cropped to the rectangle as it is *now* rather than as it was on
     # opening, so that a dragged rectangle takes effect without a reload.
-    tool_widgets += plnapana.make_analysis_widgets(
+    analysis_widgets = plnapana.make_analysis_widgets(
         viewer,
         lambda: plprep.apply_mask_rect(labels_layer.data, _rect_from_layer()))
 
-    # ----- navigation buttons, side by side at the bottom ---------------------
-    # These three all close the viewer, so they are kept together and away from
-    # the editing tools above.
-    tool_widgets.append(Container(
-        layout='horizontal', labels=False,
-        widgets=[action_buttons[k] for k in ('j', 'n', 'q')]))
+    # ----- assemble the tools panel -------------------------------------------
+    # Widgets that belong to one button are put in a titled box, so it is clear
+    # which inputs feed which action — the spinboxes were otherwise just floating
+    # above whichever button happened to follow them. napari's stylesheet already
+    # gives QGroupBox a themed border and title, so nothing is styled here.
+    #
+    # A QGroupBox is plain Qt and a magicgui Container only takes magicgui
+    # widgets, so the stacking is done in a QVBoxLayout instead. That also means
+    # no widget gets magicgui's (here always empty) left-hand label column.
+    from qtpy.QtWidgets import QGroupBox, QVBoxLayout, QWidget
+
+    def _group_box(title, widgets):
+        """A titled, bordered box around a few magicgui widgets."""
+        box = QGroupBox(title)
+        box.setLayout(QVBoxLayout())
+        box.layout().setContentsMargins(6, 6, 6, 6)
+        for widget in widgets:
+            box.layout().addWidget(widget.native)
+        return box
+
+    # Everything that edits the labels wholesale, as opposed to by hand with the
+    # brush or with r/t at the mouse.
+    segmentation_widgets = [remove_small_widget, remove_large_widget,
+                            action_buttons['u']]
+
+    # Info box on top as a legend, the two boxes in the middle, and the buttons
+    # that leave this plate on one row at the bottom.
+    nav_row = Container(layout='horizontal', labels=False,
+                        widgets=[action_buttons[k] for k in ('j', 'n', 'q')])
+    panel_entries = [info_box, shift_widget,
+                     _group_box("Improve segmentation", segmentation_widgets)]
+    # Saving from within the viewer is only possible when curr_file was given;
+    # otherwise the button is omitted and the caller saves what we return.
+    if curr_file is not None:
+        panel_entries.append(action_buttons['w'])
+    if reload_widget is not None:
+        panel_entries.append(reload_widget)
+    panel_entries.append(_group_box("Analysis preview", analysis_widgets))
+    panel_entries.append(nav_row)
 
     # ----- keep the keyboard working after clicking ---------------------------
     # The action buttons restore canvas focus themselves (see the loop above);
     # the magicgui ones are hooked here via their `called` signal, so that no
     # button leaves focus behind in the dock where the shortcuts don't reach.
-    for _widget in tool_widgets:
-        if hasattr(_widget, 'called'):
+    # Listed explicitly, since the boxed ones are no longer in `panel_entries`.
+    for _widget in ([shift_widget, remove_small_widget, remove_large_widget,
+                     reload_widget] + analysis_widgets):
+        if _widget is not None:
             _widget.called.connect(lambda *_: _focus_canvas())
 
-    # ----- dock widgets as a single stacked panel ------------------------------
-    # `labels=False`: magicgui otherwise puts every child in a two-column row
-    # with a (here always empty) name label on the left, which indents the info
-    # box and the buttons. The magicgui widgets keep their own internal labels
-    # ("Min area (px)" etc.), as those live in their own containers.
-    tools_container = Container(widgets=tool_widgets, labels=False)
-    viewer.window.add_dock_widget(tools_container, name="Tools")
+    # ----- dock the panel as a single stacked column --------------------------
+    tools_panel = QWidget()
+    tools_layout = QVBoxLayout(tools_panel)
+    tools_layout.setContentsMargins(6, 6, 6, 6)
+    tools_layout.setSpacing(6)
+    for entry in panel_entries:
+        tools_layout.addWidget(entry if isinstance(entry, QWidget) else entry.native)
+    tools_layout.addStretch()  # keep the boxes at their natural height
+    viewer.window.add_dock_widget(tools_panel, name="Tools")
 
     # ----- restore persisted session state ------------------------------------
     shift_widget.shift_x.value = session_state.shift_x

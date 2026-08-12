@@ -187,7 +187,8 @@ stored parameter `prepr_info` in the segfile contains the cropping information.
     it with 3 positional arguments and unpacks 2 return values. Scripts must
     pass `edit_annotation_napari_cheekycells`, the adapter that keeps that
     older shape; drop it once cheeky_cells is updated.
-- The editor's "Analyze plate" button measures the labels *on screen*, cropped
+- The editor's analysis button ("Preview analysis result", in the "Analysis
+  preview" box) measures the labels *on screen*, cropped
   to the rectangle as it is at that moment (so unlike the rest of the editor it
   does not need a reload after dragging), and never touches disk: no .tsv and no
   plot are written, and unsaved edits are measured as they are. It blocks the
@@ -197,10 +198,12 @@ stored parameter `prepr_info` in the segfile contains the cropping information.
   read at closing time), updated on every widget change, so they carry over to
   the next file of a session.
 - Every action of the napari editor is declared once in the `ACTIONS` table in
-  `edit_annotation_napari` — `(key, caption, callback, gets a button)` — which
-  is what builds the keybindings, the buttons and the help text, so add new
-  actions there rather than writing a `@viewer.bind_key` by hand. Buttons are
+  `edit_annotation_napari` — `(key, caption, callback, gets_button, needs_mouse)`
+  — which is what builds the keybindings, the buttons and the help text, so add
+  new actions there rather than writing a `@viewer.bind_key` by hand. Buttons are
   captioned `"Caption [k]"`, so each one advertises its own shortcut.
+  `needs_mouse` (not `not gets_button`) is what puts an action in the info box:
+  'w' also loses its button when `curr_file` is None, but is not a mouse action.
   The two mouse-position actions ('r', 't') deliberately have no button:
   clicking in the dock takes the pointer off the canvas, and
   `viewer.cursor.position` then holds wherever the mouse last crossed the canvas
@@ -208,6 +211,14 @@ stored parameter `prepr_info` in the segfile contains the cropping information.
   the top of the Tools panel instead. Every button hands keyboard focus back to
   the canvas when it is done (`_focus_canvas`), otherwise focus stays in a
   spinbox and the shortcuts appear to stop working.
+- The Tools panel is stacked in a plain `QVBoxLayout`, not a magicgui
+  `Container`, because it mixes magicgui widgets with `QGroupBox` sections
+  ("Improve segmentation", "Analysis preview") that group inputs with the button
+  they feed. napari's stylesheet themes `QGroupBox` already, so don't style it.
+  Add a section with the local `_group_box(title, widgets)` helper and append it
+  to `panel_entries`; entries may be either magicgui widgets or raw QWidgets.
+  Widgets inside a box are no longer in `panel_entries`, so the focus-restore
+  loop lists them explicitly — extend that list when adding one.
 
 
 ---
