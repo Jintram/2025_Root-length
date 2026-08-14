@@ -12,10 +12,7 @@ import cheeky_cells.orchestrators.orchestrate_phase3_clean as o3
     # import importlib; importlib.reload(crw)
 
 # Dataset-specific imports
-# To pre-process a raw image
-import root_length.functions_pipeline.preprocessing_seg as pp_ara
 import cheeky_cells.prepostprocessing_input.ara_roots.ara_plotting as plt_ara
-    # import importlib; importlib.reload(pp_ara)
 
 import cheeky_cells.plotting.plotting as pp
     # import importlib; importlib.reload(pp)
@@ -38,7 +35,7 @@ config3_ara_root = o3.Phase3Config(
     model_checkpoint_to_load = CURRENT_MODEL,
     bg_percentile = 10,
     data_path_input = DATA_DIR,
-    fn_specific_preprocessing = None, # pp_ara.preprocess_getbbox_insideplate2,
+    fn_specific_preprocessing = None, 
     fn_plotting = pp.overlayplot,
     cmap_custom = plt_ara.cmap_custom_plantclasses,
     DPI_plots = 1200
