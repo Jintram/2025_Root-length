@@ -36,6 +36,19 @@ We use the segmentation files from part 1 as input to determine the length of th
 the segmentation using a customized Napari window. It also includes a preview
 of the length analysis result.*
 
+The length measurement is based on skeletonization of the segmentation.
+The longest path through the skeleton is taken as the length
+of the respective tissue.
+
+
+<img src="figures/root_length_skeleton.png" height=300><br>
+***Figure.** Illustration of how length is determined. White and green
+outline the segmented root and shoot length respectively. Yellow, red
+and grey lines show the plant skeleton. The red part is the longest path
+belonging to root tissue. Root length is determined from the red part,
+based on pixel-to-pixel distances.*
+
+See below for more details.
 
 --------------------------------------------------------------------------------
 
