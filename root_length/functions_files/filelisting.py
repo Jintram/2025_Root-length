@@ -28,7 +28,7 @@ class fileinfo:
 
 def gen_metadatafile_segfiles(
         directory_inputfiles,
-        directory_outputfiles,
+        directory_outputfiles=None,
         file_formats=['.npz']):
     """
     Generate dataframe with list of files to analyze.
@@ -38,7 +38,8 @@ def gen_metadatafile_segfiles(
     """
     
     # make output directory
-    os.makedirs(directory_outputfiles, exist_ok=True)
+    if directory_outputfiles is not None:
+        os.makedirs(directory_outputfiles, exist_ok=True)
     
     # find all image files
     # all_paths = glob.glob(os.path.join(directory_inputfiles, '**', f'*[{"|".join(file_formats)}]'))
@@ -65,8 +66,11 @@ def gen_metadatafile_segfiles(
             })
         
     # now save the metadata file
-    metadata_toseg_filepath = os.path.join(directory_outputfiles, 'metadata_segfiles_toanalyze_autogen.xlsx')
-    df_filelist.to_excel(metadata_toseg_filepath, index=False)
+    if directory_outputfiles is not None:
+        metadata_toseg_filepath = os.path.join(directory_outputfiles, 'metadata_segfiles_toanalyze_autogen.xlsx')
+        df_filelist.to_excel(metadata_toseg_filepath, index=False)
+    else:
+        metadata_toseg_filepath = None
     
     return df_filelist, metadata_toseg_filepath
 

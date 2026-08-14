@@ -43,9 +43,9 @@ pl_edit.compute_and_save_mask_rect_all(
     df_filelist=df_filelist,
     dir_inputfiles=DIR_INPUTFILES,
     dir_imagefiles=DIR_IMAGEFILES,
-    only_process_n=None,        # int N for a test run, or None to process all
-    clear_outside_mask=False,  # True to destructively zero labels outside the rect
-    overwrite=False
+    #only_process_n=None,        # int N for a test run, or None to process all
+    #clear_outside_mask=False,  # True to destructively zero labels outside the rect
+    #overwrite=False
 )
 
 ################################################################################

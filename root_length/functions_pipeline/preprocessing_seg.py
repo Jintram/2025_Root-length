@@ -96,6 +96,7 @@ def preprocess_getbbox_insideplate(img_in_raw, margin_left = 100, margin_right =
     return img_cropped, rect
 
 
+# %%
 
 def preprocess_getbbox_insideplate2(img_in_raw, margin_left = 100, margin_right = 100, 
                                          margin_top = 250, margin_bottom = 250,

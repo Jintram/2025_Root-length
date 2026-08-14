@@ -344,6 +344,69 @@ Under the section "Output folders that will be generated" this output directory 
 
 ## Part 2: manual correction + length analysis 
 
+### importing libraries
+
+To start the analysis, you'll first need to import specific scripts from
+this repository. This can be done via the usual python import statements:
+
+```
+import root_length.functions_files.filelisting as pl_flist
+import root_length.functions_pipeline.analyze_plate as pl_analyze
+import root_length.functions_pipeline.edit_segfiles as pl_edit
+```
+
+### Compiling your list of files to analyze
+
+#### Get list of plate pictures to analyze
+
+You can now determine which files to analyze, by 
+running the following command.
+
+```
+df_filelist, metadata_toseg_filepath = \
+    pl_flist.gen_metadatafile_segfiles(
+        directory_inputfiles=/directory/with/seg/files/,
+        directory_outputfiles=/directory/to/put/output/,
+    )
+```
+
+`directory_inputfiles` needs to point to **the subdirectory with the
+segmentation files**, or `SEG/segfiles` in the above overview.
+
+You can also supply your desired output directory,
+where an excel version of the file list will
+be stored.
+
+With the code above `df_filelist` now is a dataframe with all files, 
+and `metadata_toseg_filepath` holds the path where an excel with that information
+is saved (if any).
+
+#### Determine recteangles
+
+<img src="figures/screenshot_dish_artifacts.png" width=50%><br>
+***Figure.** Non-plant segmentation artifacts due to the dish.*
+
+The segmentation was not trained well enough to distinguish
+features from the dish in which the plants are kept. 
+(Plant and dish features are sufficiently similar to make this a challenging
+task.)
+
+To handle removing dish artifacts automatically, a region of interest can
+be determined automatically, and added to the segmentation files.
+
+To achieve this, call the function `pl_edit.compute_and_save_mask_rect_all()`:
+
+```
+pl_edit.compute_and_save_mask_rect_all(
+    df_filelist=df_filelist,
+    dir_inputfiles=/directory/with/seg/files/,
+    dir_imagefiles=/directory/with/image/files/
+)
+```
+
+As input, this requires the file list (`df_filelist` argument), where to find the segmentation files
+(through `dir_inputfiles`), and the directory with the original image files
+(`dir_imagefiles`). 
 
 
 

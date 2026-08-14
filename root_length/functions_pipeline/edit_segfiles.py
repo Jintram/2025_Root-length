@@ -1263,6 +1263,8 @@ def compute_and_save_mask_rect_all(df_filelist, dir_inputfiles, dir_imagefiles,
     if only_process_n is not None:
         n_files = min(n_files, only_process_n)
     for file_idx in range(n_files):
+        # file_idx = 0
+        
         basedir, subdir, filename = \
             df_filelist.loc[file_idx, ['basedir', 'subdir', 'filename']]
         curr_file = pl_flist.fileinfo(basedir, subdir, filename, dir_inputfiles)
@@ -1292,6 +1294,7 @@ def compute_and_save_mask_rect_all(df_filelist, dir_inputfiles, dir_imagefiles,
                   f"for {imagefile_path_noext}.*")
             continue
         img_original = skio.imread(file_hits[0])
+            # plt.imshow(img_original)
 
         # If seg arrays were produced on a cropped image (prepr_info present),
         # apply that crop so mask_rect ends up in the seg coordinate frame.
@@ -1301,10 +1304,11 @@ def compute_and_save_mask_rect_all(df_filelist, dir_inputfiles, dir_imagefiles,
         if crop_rect is not None:
             minr, maxr, minc, maxc = crop_rect
             img_original = img_original[minr:maxr, minc:maxc]
+            # plt.imshow(img_original)
 
         # Compute the rect
         _, rect = pl_prepseg.preprocess_getbbox_insideplate2(
-            img_original,
+            img_in_raw=img_original,
             margin_left=margin_left, margin_right=margin_right,
             margin_top=margin_top, margin_bottom=margin_bottom,
             min_expected_area=min_expected_area)
