@@ -16,17 +16,19 @@ with the aim of determining root and shoot lenghts from these color pictures.
 We use machine learning scripts (from the package [Cheeky-cells](https://github.com/Jintram/Cheeky-cells/), a set of scripts that allow training and 
 segmenting of images) to segment the plant images.
 
-Example image:<br>
-<img src="figures/example_plant_segmentation.png" width=50%>
-
+<img src="figures/example_plant_segmentation.png" width=50%><br>
+*Original image and segmentation overlay (shifted a few pixels to the 
+right for visualization purposes). 
+White is the root, green is the shoot, brown is the seed, and dark green are leaves (as determined by 
+the segmentation). Minor artifcats can be addressed during manual correction
+with a napari GUI. In this example, the right-most plant couldn't be
+segmented properly.*
 
 ### Part 2 quantifies root & shoot lengths
 
-It uses segmentation files from part 1 as input to determine the length of the root and shoot from each plant.
+We use the segmentation files from part 1 as input to determine the length of the root and shoot from each plant.
 The image below shows the length measurement of a plant:<br>
-<img src="figures/screenshot_plant-analysis.png" width=50%><br>
-**Image description:** *White is the root, green is the shoot, brown is the seed, and dark green are leaves (as determined by 
-the segmentation).*
+<img src="figures/screenshot_plant-analysis.png" width=50%>
 
 --------------------------------------------------------------------------------
 
