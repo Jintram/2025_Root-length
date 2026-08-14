@@ -76,6 +76,10 @@ projects/20260621_highresmodel-crop-TESTSET
 current 1st file:
 20250530_OY_09_all-plants-projected.pdf
 
+[ ] CONTINUE WITH
+    - documentation_technical.md (note "TO DO"s)
+    - README.md
+
 (previously created some additional featuers in the napari GUI)
 
 **
