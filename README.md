@@ -1,9 +1,10 @@
 
 
+--------------------------------------------------------------------------------
 
+# Quantifying root length
 
-### Quantifying root length
-
+--------------------------------------------------------------------------------
 
 ## Project description
 
@@ -16,10 +17,10 @@ The scripts here
 segmenting of images) to segment the plant images.
 2. Use segmentation files as input to determine the length of each plant.
 
-The image below shows the segmentation of the plants:
+The image below shows the segmentation of the plants:<br>
 <img src="figures/example_plant_segmentation.png" width=50%>
 
-The image below shows the length measurement of a plant:
+The image below shows the length measurement of a plant:<br>
 <img src="figures/screenshot_plant-analysis.png" width=50%>
 
 
@@ -28,6 +29,7 @@ the segmentation).*
 
 We want to determine the size of the root and the size of the shoot.
 
+--------------------------------------------------------------------------------
 
 ## Setup
 
@@ -67,7 +69,13 @@ Then, you need to run the following command (replace `/path/to/script/directory`
 pip install -e /path/to/script/directory
 ```
 
-## Workflow and input/output directories
+--------------------------------------------------------------------------------
+
+# How to use
+
+--------------------------------------------------------------------------------
+
+## Input/output directories
 
 ### Expected input folders
 
@@ -116,9 +124,9 @@ Because `LEN/data` contains a `.tsv` file for each plate, you can later
 easily combine data from multiple datasets that were analyzed separately.
 
 
-## Usage of this package
-
 -----------------------------------------------------------------------------
+
+## Part 1: Segmentation
 
 ### Loading libraries and setting up
 
@@ -244,11 +252,10 @@ On other machine's than new macbooks, the `target_device` setting is relevant as
         'cuda' if available.
 ```
 
+### Compiling list of image files to segment.
 
-### Collecting list of image files to segment.
-
-To continue segmentation, the pipeline requires you to collect a list of images,
-which can be done with 
+To start segmentation, the pipeline requires you to first compile a list of the 
+images in your data directory, which can be done with 
 
 ```
 config3_ara_root = o3.collect_filelist(config3_ara_root)
@@ -278,7 +285,7 @@ you want to re-use this data for training.
 For a general segmentation run, `<yourconfig>.df_metadata` just serves as a file list for all
 the files you want to segment (in pandas dataframe format).
 
-## Actually running the pipeline
+### Running the pipeline
 
 Running the command `o3.segment_all_files(<yourconfig>)` will 
 now automatically start segmenting the images in the folder 
@@ -304,18 +311,28 @@ Under the section "Output folders that will be generated" this output directory 
 -----------------------------------------------------------------------------
 
 
+## Part 2: manual correction + length analysis 
 
 
 
 
+
+-----------------------------------------------------------------------------
 
 # Installation instructions for developers
 
+-----------------------------------------------------------------------------
+
 - Contributors additionally install: `mamba install -c conda-forge pytest ruff`
 
+-----------------------------------------------------------------------------
 
 # Potential things to improve
 
+-----------------------------------------------------------------------------
+
 - Improve the cropping procedure (use another ML model to detect foreground/background?)
+
+-----------------------------------------------------------------------------
 
 
