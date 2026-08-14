@@ -67,9 +67,9 @@ CONTINUE HERE
 
 CONTINUE WITH 
 
-(1) test run the napari updates
-    (1b) maybe also re-organize the button and text positions..
-    (1c) !!! git merge into main!!!! <----------------------------------------------
+[X] (1) test run the napari updates
+    [X] (1b) maybe also re-organize the button and text positions..
+    [X] (1c) !!! git merge into main!!!! <----------------------------------------------
 (2) MAKING A "WALK-THROUGH" OF THE CODE, USING PY FILES IN:
 projects/20260621_highresmodel-crop-TESTSET
 
@@ -137,3 +137,7 @@ in the tissue class?
   `== 2`) (and also of course `root_tissue` or `shoot_tissue` restrict
   the analysis to only root-shoot analysis). This occurs e.g. in `analyze_plate()`
   and `assign_nearest_tissue()`. Should this be made more general?
+- [ ] When there are a few pixels of misclassified root along the shoot, or 
+vice versa, this will result in not having a joined skeleton (because that 
+requires having only two connected components). Can be fixed e.g. by removing 
+small parts (e.g. <5 px) automatically on a per-tissue masks.

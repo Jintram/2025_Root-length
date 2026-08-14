@@ -22,6 +22,8 @@ Assumed behaviour pinned down here:
   and a section left with no contents at all is not built
 - the size-filter buttons sit on one row with their own spinbox
 - smoothing radius defaults to 5 pipeline-wide, and None stays a valid "off"
+- the navigation section opens with the close hint, then a 2x2 button grid
+  (save | next / jump | quit), which closes up when the save button is absent
 - the regrouping lost nothing: all 9 buttons, 2 sliders, 6 spinboxes, 1 checkbox
 - the "Quit, no save [q]" button does what the 'q' key does
 - with curr_file=None there is no save button and no reload button, but all
@@ -192,16 +194,23 @@ def test_button_captions_advertise_their_shortcut(monkeypatch):
 
 
 def mouse_hint_of(panel):
-    """The hint naming the keys that act at the mouse position."""
+    """
+    The hint naming the keys that act at the mouse position.
+
+    Found by the keys it mentions rather than by its opening words, which are
+    wording that gets tuned; what matters is which keys it names.
+    """
     return next(lbl.text() for lbl in panel.findChildren(QLabel)
-                if lbl.text().startswith('Press ['))
+                if '[r]' in lbl.text())
 
 
 def test_mouse_hint_lists_only_the_mouse_actions(monkeypatch):
     """The hint names r and t, generated from ACTIONS rather than hardcoded."""
     _, panel, _ = open_editor(monkeypatch, FakeFile())
-    assert mouse_hint_of(panel) == \
-        'Press [r] or [t] (slightly different result) and then ..'
+    hint = mouse_hint_of(panel)
+    assert '[r]' in hint and '[t]' in hint
+    # actions that do have a button carry their own key, so they stay out
+    assert '[u]' not in hint and '[w]' not in hint
 
 
 def test_mouse_hint_excludes_buttonless_w_without_a_file(monkeypatch):
@@ -240,8 +249,9 @@ def test_each_control_sits_in_its_own_section(monkeypatch):
     assert buttons_of(boxes[2]) == ['Remove smaller', 'Remove larger',
                                     'Relabel by lines [u]']
     assert buttons_of(boxes[3]) == ['Preview analysis result']
-    assert buttons_of(boxes[4]) == ['Save now [w]', 'Jump to sample [j]',
-                                    'Next file, no save [n]', 'Quit, no save [q]']
+    # 2x2 grid, read row by row: save | next / jump | quit
+    assert buttons_of(boxes[4]) == ['Save now [w]', 'Next file, no save [n]',
+                                    'Jump to sample [j]', 'Quit, no save [q]']
 
 
 def test_hints_sit_in_the_section_they_describe(monkeypatch):
@@ -252,8 +262,8 @@ def test_hints_sit_in_the_section_they_describe(monkeypatch):
     def texts(box):
         return ' '.join(lbl.text() for lbl in box.findChildren(QLabel))
 
-    assert 'Press [r]' in texts(boxes[2])   # with the relabel/size controls
-    assert 'Cmd+W' in texts(boxes[4])       # with the buttons that leave
+    assert '[r]' in texts(boxes[2])    # with the relabel/size controls
+    assert 'Cmd+W' in texts(boxes[4])  # with the buttons that leave
 
 
 def test_a_hint_set_to_none_is_left_out(monkeypatch):
@@ -282,6 +292,42 @@ def test_size_filter_buttons_share_a_row_with_their_input(monkeypatch):
         assert isinstance(row.layout(), QHBoxLayout)
         assert row.findChildren(QAbstractSpinBox), \
             f"{caption} is not on a row with a spinbox"
+
+
+def test_navigation_buttons_form_a_2x2_grid(monkeypatch):
+    """The hint comes first, then save|next over jump|quit in a 2x2 grid."""
+    from qtpy.QtWidgets import QGridLayout
+
+    _, panel, _ = open_editor(monkeypatch, FakeFile())
+    nav_box = group_boxes_of(panel)[-1]
+
+    # the closing hint is above the buttons
+    hint = nav_box.findChildren(QLabel)[0]
+    assert 'Cmd+W' in hint.text()
+
+    grid = next(w.layout() for w in nav_box.findChildren(QWidget)
+                if isinstance(w.layout(), QGridLayout))
+    assert (grid.rowCount(), grid.columnCount()) == (2, 2)
+    placed = {(grid.getItemPosition(i)[0], grid.getItemPosition(i)[1]):
+              grid.itemAt(i).widget().text() for i in range(grid.count())}
+    assert placed == {(0, 0): 'Save now [w]', (0, 1): 'Next file, no save [n]',
+                      (1, 0): 'Jump to sample [j]', (1, 1): 'Quit, no save [q]'}
+
+
+def test_navigation_grid_closes_up_without_the_save_button(monkeypatch):
+    """With no file to save into, the remaining three fill the grid without a hole."""
+    from qtpy.QtWidgets import QGridLayout
+
+    _, panel, _ = open_editor(monkeypatch, None)
+    nav_box = group_boxes_of(panel)[-1]
+    grid = next(w.layout() for w in nav_box.findChildren(QWidget)
+                if isinstance(w.layout(), QGridLayout))
+
+    placed = {(grid.getItemPosition(i)[0], grid.getItemPosition(i)[1]):
+              grid.itemAt(i).widget().text() for i in range(grid.count())}
+    assert placed == {(0, 0): 'Next file, no save [n]',
+                      (0, 1): 'Jump to sample [j]',
+                      (1, 0): 'Quit, no save [q]'}
 
 
 def test_smoothing_defaults_to_5_everywhere(monkeypatch):

@@ -36,7 +36,7 @@ from dataclasses import dataclass
 import numpy as np
 import napari
 from magicgui import magicgui
-from magicgui.widgets import Container, Label, PushButton
+from magicgui.widgets import PushButton
 
 import root_length.functions_files.filelisting as ffl
     # import importlib; importlib.reload(ffl)
@@ -805,8 +805,8 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     mouse_actions = [(k, c) for k, c, _, _, needs_mouse in ACTIONS if needs_mouse]
     hint_view = None  # "Moves the image only, to line it up with the labels."
     hint_rect = None
-    hint_mouse = ("Press " + " or ".join(f"[{k}]" for k, _ in mouse_actions) +
-                  " (slightly different result) and then ..")
+    hint_mouse = ("Adjust root/shoot boundary by " + " or ".join(f"[{k}]" for k, _ in mouse_actions) +
+                  " and ..")
     hint_close = ("<b>Cmd+W / Ctrl+W</b> (or the window close button) saves "
                   "and goes to the next plate.")
 
@@ -852,8 +852,8 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     # widgets, so the stacking is done in a QVBoxLayout instead. That also means
     # no widget gets magicgui's (here always empty) left-hand label column.
     from qtpy.QtCore import Qt
-    from qtpy.QtWidgets import (QGroupBox, QLabel, QScrollArea, QVBoxLayout,
-                                QWidget)
+    from qtpy.QtWidgets import (QGridLayout, QGroupBox, QLabel, QScrollArea,
+                                QVBoxLayout, QWidget)
 
     def _hint(text):
         """
@@ -871,6 +871,20 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
         # these hints carry their markup in the middle rather than at the start.
         label.setTextFormat(Qt.TextFormat.RichText)
         return label
+
+    def _button_grid(buttons, columns=2):
+        """
+        Lay buttons out in a grid, filling row by row.
+
+        None entries are dropped first, so a missing button (no 'Save now' when
+        there is no file) closes the grid up instead of leaving a hole.
+        """
+        grid_widget = QWidget()
+        grid = QGridLayout(grid_widget)
+        grid.setContentsMargins(0, 0, 0, 0)
+        for position, button in enumerate(b for b in buttons if b is not None):
+            grid.addWidget(button.native, position // columns, position % columns)
+        return grid_widget
 
     def _group_box(title, entries):
         """
@@ -918,13 +932,13 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     # 4. Check whether the correction did what was meant (writes nothing).
     panel_entries.append(_group_box("Analysis preview", analysis_widgets))
 
-    # 5. Leaving the plate. Saving from within the viewer is only possible when
-    #    curr_file was given; otherwise `action_buttons` has no 'w' entry, the
-    #    button is left out, and the caller saves what we return.
-    nav_row = Container(layout='horizontal', labels=False,
-                        widgets=[action_buttons[k] for k in ('j', 'n', 'q')])
-    panel_entries.append(_group_box("Navigation", [
-        action_buttons.get('w'), _hint(hint_close), nav_row]))
+    # 5. Leaving the plate: the closing hint first, then the four ways out in a
+    #    2x2 grid (save | next / jump | quit). Saving from within the viewer is
+    #    only possible when curr_file was given; otherwise `action_buttons` has
+    #    no 'w' entry, that button drops out and the remaining three close the
+    #    grid up rather than leaving a hole, and the caller saves what we return.
+    nav_grid = _button_grid([action_buttons.get(k) for k in ('w', 'n', 'j', 'q')])
+    panel_entries.append(_group_box("Navigation", [_hint(hint_close), nav_grid]))
 
     # ----- keep the keyboard working after clicking ---------------------------
     # The action buttons restore canvas focus themselves (see the loop above);
