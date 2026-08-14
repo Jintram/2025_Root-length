@@ -26,7 +26,7 @@ SEGMENTATION_DIR = '/Users/m.wehrens/Data_notbacked/2025_hypocotyl_images/SEG_20
 CURRENT_MODEL = '/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/TRAININGDIR_SET-1n2_20260618_cleaned/models/modelUNet20260619_2100__trained0d19h46m.pth'
 DATA_DIR = '/Users/m.wehrens/Data_notbacked/2025_hypocotyl_images/DATA/tif/high_res/20250527/'
 
-
+    
 # Now initialize a configuration
 config3_ara_root = o3.Phase3Config(
     segmentation_dir = SEGMENTATION_DIR,

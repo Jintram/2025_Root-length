@@ -17,7 +17,7 @@ We use machine learning scripts (from the package [Cheeky-cells](https://github.
 segmenting of images) to segment the plant images.
 
 <img src="figures/example_plant_segmentation.png" width=50%><br>
-*Original image and segmentation overlay (shifted a few pixels to the 
+***Image.** Original image and segmentation overlay (shifted a few pixels to the 
 right for visualization purposes). 
 White is the root, green is the shoot, brown is the seed, and dark green are leaves (as determined by 
 the segmentation). Minor artifcats can be addressed during manual correction
