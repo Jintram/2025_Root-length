@@ -12,12 +12,15 @@ magicgui and Qt are real, which is where the panel-building code lives.
 Assumed behaviour pinned down here:
 - every action in `ACTIONS` gets a keybinding, whether or not it has a button
 - each button caption ends in "[<key>]", so it advertises its own shortcut
-- the info box lists the mouse-position actions ('r', 't') and nothing else,
-  also when curr_file is None (where 'w' is buttonless but is not a mouse action)
-- the panel groups widgets into the "Improve segmentation" and
-  "Analysis preview" boxes, with the analysis button inside the latter
+- the r/t hint lists the mouse-position actions and nothing else, also when
+  curr_file is None (where 'w' is buttonless but is not a mouse action)
+- the panel holds the five numbered sections, in workflow order
+- each button sits in the section for the step it belongs to
+- each hint sits in the box holding the controls it describes
+- the regrouping lost nothing: all 9 buttons, 2 sliders, 6 spinboxes, 1 checkbox
 - the "Quit, no save [q]" button does what the 'q' key does
-- with curr_file=None there is no save button and no reload button
+- with curr_file=None there is no save button and no reload button, but all
+  five sections are still there
 - pressing 'r' routes to correct_mask_rootshootline at the cursor position
 """
 
@@ -25,8 +28,8 @@ import types
 
 import numpy as np
 import pytest
-from qtpy.QtWidgets import (QApplication, QGroupBox, QPushButton, QWidget,
-                            QLabel)
+from qtpy.QtWidgets import (QAbstractSpinBox, QApplication, QCheckBox,
+                            QGroupBox, QLabel, QPushButton, QSlider, QWidget)
 
 import napari
 
@@ -169,39 +172,82 @@ def test_button_captions_advertise_their_shortcut(monkeypatch):
         assert f"{caption} [{key}]" in captions
 
 
-def test_info_box_lists_only_the_mouse_actions(monkeypatch):
-    """The info box advertises r and t, the two actions that have no button."""
+def test_mouse_hint_lists_only_the_mouse_actions(monkeypatch):
+    """The r/t hint advertises those two actions and no others."""
     _, panel, _ = open_editor(monkeypatch, FakeFile())
-    info = next(lbl.text() for lbl in panel.findChildren(QLabel)
-                if 'Hover over the plant' in lbl.text())
-    assert 'draw root/shoot line' in info
-    assert 'draw through-line' in info
-    assert 'save now' not in info.lower()
+    hint = next(lbl.text() for lbl in panel.findChildren(QLabel)
+                if 'Hover over a plant' in lbl.text())
+    assert 'draw root/shoot line' in hint
+    assert 'draw through-line' in hint
+    assert 'save now' not in hint.lower()
 
 
-def test_info_box_excludes_buttonless_w_without_a_file(monkeypatch):
+def test_mouse_hint_excludes_buttonless_w_without_a_file(monkeypatch):
     """With curr_file=None, 'w' loses its button but is not a mouse action."""
     _, panel, _ = open_editor(monkeypatch, None)
-    info = next(lbl.text() for lbl in panel.findChildren(QLabel)
-                if 'Hover over the plant' in lbl.text())
-    assert 'save now' not in info.lower()
+    hint = next(lbl.text() for lbl in panel.findChildren(QLabel)
+                if 'Hover over a plant' in lbl.text())
+    assert 'save now' not in hint.lower()
 
 
 ################################################################################
 # %% the panel layout
 
-def test_panel_groups_widgets_into_titled_boxes(monkeypatch):
-    """The size filters and the analysis settings sit in their own QGroupBox."""
+SECTIONS = ['1. View', '2. Plate area', '3. Improve segmentation',
+            '4. Analysis preview', '5. Save & continue']
+
+
+def test_sections_appear_in_workflow_order(monkeypatch):
+    """The five boxes are present and stacked in the order they are worked through."""
+    _, panel, _ = open_editor(monkeypatch, FakeFile())
+    titles = [box.title() for box in panel.findChildren(QGroupBox)]
+    assert titles == SECTIONS
+
+
+def test_each_control_sits_in_its_own_section(monkeypatch):
+    """Every button lives in the section of the step it belongs to."""
     _, panel, _ = open_editor(monkeypatch, FakeFile())
     boxes = group_boxes_of(panel)
-    assert set(boxes) == {'Improve segmentation', 'Analysis preview'}
 
-    seg_buttons = buttons_of(boxes['Improve segmentation'])
-    assert 'Remove smaller' in seg_buttons
-    assert 'Remove larger' in seg_buttons
-    assert 'Relabel by lines [u]' in seg_buttons
+    assert buttons_of(boxes['2. Plate area']) == \
+        ['Save + reload plate (e.g. after adjusting rect)']
+    assert buttons_of(boxes['3. Improve segmentation']) == \
+        ['Remove smaller', 'Remove larger', 'Relabel by lines [u]']
+    assert buttons_of(boxes['4. Analysis preview']) == \
+        ['Preview analysis result']
+    assert buttons_of(boxes['5. Save & continue']) == \
+        ['Save now [w]', 'Jump to sample [j]', 'Next file, no save [n]',
+         'Quit, no save [q]']
 
-    assert 'Preview analysis result' in buttons_of(boxes['Analysis preview'])
+
+def test_hints_sit_in_the_section_they_describe(monkeypatch):
+    """Each explanation is inside the box holding the controls it talks about."""
+    _, panel, _ = open_editor(monkeypatch, FakeFile())
+    boxes = group_boxes_of(panel)
+
+    def texts(box):
+        return ' '.join(lbl.text() for lbl in box.findChildren(QLabel))
+
+    assert 'line it up' in texts(boxes['1. View'])
+    assert 'Drag the red rectangle' in texts(boxes['2. Plate area'])
+    assert 'Hover over a plant' in texts(boxes['3. Improve segmentation'])
+    assert 'Cmd+W' in texts(boxes['5. Save & continue'])
+
+
+def test_nothing_was_lost_in_the_regrouping(monkeypatch):
+    """The panel still holds every control it had before it was sectioned."""
+    _, panel, _ = open_editor(monkeypatch, FakeFile())
+
+    assert sorted(buttons_of(panel)) == sorted([
+        'Remove smaller', 'Remove larger', 'Relabel by lines [u]',
+        'Save now [w]', 'Save + reload plate (e.g. after adjusting rect)',
+        'Preview analysis result', 'Jump to sample [j]',
+        'Next file, no save [n]', 'Quit, no save [q]'])
+    # 2 shift sliders, 2 size thresholds, 2 analysis settings (each with a
+    # spinbox), plus the one analysis checkbox
+    assert len(panel.findChildren(QSlider)) == 2
+    assert len(panel.findChildren(QAbstractSpinBox)) == 6
+    assert len(panel.findChildren(QCheckBox)) == 1
 
 
 def test_no_save_buttons_without_a_file(monkeypatch):
@@ -210,9 +256,8 @@ def test_no_save_buttons_without_a_file(monkeypatch):
     captions = buttons_of(panel)
     assert 'Save now [w]' not in captions
     assert not any('reload' in c.lower() for c in captions)
-    # the rest of the panel is still there
-    assert set(group_boxes_of(panel)) == {'Improve segmentation',
-                                          'Analysis preview'}
+    # the sections themselves are all still there
+    assert [box.title() for box in panel.findChildren(QGroupBox)] == SECTIONS
 
 
 ################################################################################

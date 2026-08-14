@@ -525,11 +525,17 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     new rect. It is a jump to the current sample, so it needs a caller that
     acts on 'go_to' and a `curr_file.file_idx` (ie `edit_all_segfiles`).
 
-    The tools panel groups widgets that belong together into titled QGroupBoxes:
-    "Improve segmentation" (the size filters and the relabel button) and
-    "Analysis preview" (the analysis settings and their button). The latter is
-    built by `napari_analysis`; it measures the labels as they are on screen and
-    draws the result in extra `analysis: ...` layers. Nothing is saved by it.
+    The tools panel is split into five numbered QGroupBox sections, ordered the
+    way a plate is worked through: "1. View" (the shift sliders), "2. Plate
+    area" (how to drag the rectangle, and the reload button that shows its
+    effect), "3. Improve segmentation" (the size filters, the r/t hint and the
+    relabel button), "4. Analysis preview" and "5. Save & continue" (saving and
+    the three buttons that leave this plate). Each section holds its own inputs,
+    button and hint, so the explanations sit next to what they describe.
+
+    Section 4 is built by `napari_analysis`; it measures the labels as they are
+    on screen and draws the result in extra `analysis: ...` layers. Nothing is
+    saved by it.
 
     Every action of this editor is declared once in the `ACTIONS` table below,
     which is what builds the keybindings, the buttons and the help text, so the
@@ -783,29 +789,31 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
                 lambda *_, fn=_callback: (fn(), _focus_canvas()))
             action_buttons[_key] = _button
 
-    # The info box carries what the buttons cannot: the keys that need a mouse
-    # position. Everything else is self-documenting, since each button caption
-    # ends in its own key. Closing the window is napari's own shortcut rather
-    # than one of ours, but it is how a session actually moves along (nothing
-    # sets `save_on_close` to False, so the labels are written and the loop goes
-    # on), and it is worth spelling out next to the 'n' button that does the
-    # opposite.
+    # Hints for what a button cannot say by itself: the keys that need a mouse
+    # position, the draggable rectangle, and closing the window. Each is shown
+    # inside the section it belongs to (see the panel assembly below) rather
+    # than in one legend, so it is read next to the thing it describes.
+    # Everything else is self-documenting, since each button caption ends in its
+    # own key. Note the close hint is about napari's own shortcut rather than
+    # one of ours, but it is how a session actually moves along: nothing sets
+    # `save_on_close` to False, so the labels are written and the loop goes on.
     mouse_actions = [(k, c) for k, c, _, _, needs_mouse in ACTIONS if needs_mouse]
-    close_note = ("Cmd+W / Ctrl+W (or the window close button) "
-                  "= save and go to the next plate")
-    info_box = Label(value=(
-        "<b>Hover over the plant, then press:</b><br>" +
-        "<br>".join(f"&nbsp;&nbsp;<b>{k}</b> &mdash; {c.lower()}"
-                    for k, c in mouse_actions) +
-        "<br><b>Cmd+W / Ctrl+W</b> (or the window close button)<br>"
-        "&nbsp;&nbsp;&mdash; save and go to the next plate"))
-    info_box.native.setWordWrap(True)
+    hint_view = "Moves the image only, to line it up with the labels."
+    hint_rect = ("Drag the red rectangle to set the area that gets measured; "
+                 "labels outside it are kept, not deleted.")
+    hint_mouse = ("Hover over a plant, then press:<br>" +
+                  "<br>".join(f"&nbsp;&nbsp;<b>{k}</b> &mdash; {c.lower()}"
+                              for k, c in mouse_actions))
+    hint_close = ("<b>Cmd+W / Ctrl+W</b> (or the window close button) saves "
+                  "and goes to the next plate.")
 
     print("____\nStarting Napari editor window\n===\n"
-          "Buttons in the Tools panel show their shortcut in [].\n"
-          "These have no button — hover over the plant and press:\n" +
-          "\n".join(f"  {k} = {c.lower()}" for k, c in mouse_actions) +
-          f"\n{close_note}\n____")
+          "The Tools panel is ordered by when you need it; buttons show their\n"
+          "keyboard shortcut in []. Not on a button:\n" +
+          "\n".join(f"  {k} = {c.lower()} (at the mouse position)"
+                    for k, c in mouse_actions) +
+          "\n  Cmd+W / Ctrl+W = save and go to the next plate"
+          "\n____")
 
     # ----- widget: save and reopen the same plate -----------------------------
     # After dragging the rectangle, this is how you see what it did: saving and
@@ -830,44 +838,82 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
         lambda: plprep.apply_mask_rect(labels_layer.data, _rect_from_layer()))
 
     # ----- assemble the tools panel -------------------------------------------
-    # Widgets that belong to one button are put in a titled box, so it is clear
-    # which inputs feed which action — the spinboxes were otherwise just floating
-    # above whichever button happened to follow them. napari's stylesheet already
-    # gives QGroupBox a themed border and title, so nothing is styled here.
+    # The panel is ordered the way a plate is worked through: line up the view,
+    # set the area that counts, fix the mask, check the result, move on. Each
+    # step is a titled box holding its own inputs, button and hint, so it is
+    # clear which controls feed which action, and hints are read next to the
+    # thing they describe. napari's stylesheet already gives QGroupBox a themed
+    # border and title, so nothing is styled here.
     #
     # A QGroupBox is plain Qt and a magicgui Container only takes magicgui
     # widgets, so the stacking is done in a QVBoxLayout instead. That also means
     # no widget gets magicgui's (here always empty) left-hand label column.
-    from qtpy.QtWidgets import QGroupBox, QVBoxLayout, QWidget
+    from qtpy.QtCore import Qt
+    from qtpy.QtWidgets import (QGroupBox, QLabel, QScrollArea, QVBoxLayout,
+                                QWidget)
 
-    def _group_box(title, widgets):
-        """A titled, bordered box around a few magicgui widgets."""
+    def _hint(text):
+        """
+        A wrapped line of explanation to put inside a box.
+
+        Set apart by italics rather than by a colour: napari ships light and
+        dark themes, and a hard-coded grey would be unreadable in one of them.
+        """
+        label = QLabel(text)
+        label.setWordWrap(True)
+        label.setStyleSheet("font-style: italic;")
+        # Set explicitly: the default AutoText guesses from the string, and
+        # these hints carry their markup in the middle rather than at the start.
+        label.setTextFormat(Qt.TextFormat.RichText)
+        return label
+
+    def _group_box(title, entries):
+        """
+        A titled, bordered box around magicgui widgets and/or plain QWidgets.
+
+        Mixing the two is the point: the hints are QLabels while the controls
+        come from magicgui.
+        """
         box = QGroupBox(title)
         box.setLayout(QVBoxLayout())
         box.layout().setContentsMargins(6, 6, 6, 6)
-        for widget in widgets:
-            box.layout().addWidget(widget.native)
+        for entry in entries:
+            box.layout().addWidget(
+                entry if isinstance(entry, QWidget) else entry.native)
         return box
 
-    # Everything that edits the labels wholesale, as opposed to by hand with the
-    # brush or with r/t at the mouse.
-    segmentation_widgets = [remove_small_widget, remove_large_widget,
-                            action_buttons['u']]
+    # 1. Line up the image under the labels (a session-wide setting, so this is
+    #    usually touched once, on the first plate).
+    panel_entries = [_group_box("1. View", [shift_widget, _hint(hint_view)])]
 
-    # Info box on top as a legend, the two boxes in the middle, and the buttons
-    # that leave this plate on one row at the bottom.
+    # 2. The plate area. There is no widget for the rectangle itself — it is
+    #    dragged on the canvas — so the hint is the only thing that says so, and
+    #    the reload button next to it is how its effect is seen.
+    rect_entries = [_hint(hint_rect)]
+    if reload_widget is not None:
+        rect_entries.append(reload_widget)
+    panel_entries.append(_group_box("2. Plate area", rect_entries))
+
+    # 3. Fixing the mask: the size filters do a bulk pass, then r/t and 'u' are
+    #    the per-plant fixes (and 'u' consumes the lines that r/t draw, so it
+    #    comes after the hint that describes them).
+    panel_entries.append(_group_box("3. Improve segmentation", [
+        remove_small_widget, remove_large_widget,
+        _hint(hint_mouse), action_buttons['u']]))
+
+    # 4. Check whether the correction did what was meant (writes nothing).
+    panel_entries.append(_group_box("4. Analysis preview", analysis_widgets))
+
+    # 5. Leaving the plate. Saving from within the viewer is only possible when
+    #    curr_file was given; otherwise the button is omitted and the caller
+    #    saves what we return.
     nav_row = Container(layout='horizontal', labels=False,
                         widgets=[action_buttons[k] for k in ('j', 'n', 'q')])
-    panel_entries = [info_box, shift_widget,
-                     _group_box("Improve segmentation", segmentation_widgets)]
-    # Saving from within the viewer is only possible when curr_file was given;
-    # otherwise the button is omitted and the caller saves what we return.
+    finish_entries = []
     if curr_file is not None:
-        panel_entries.append(action_buttons['w'])
-    if reload_widget is not None:
-        panel_entries.append(reload_widget)
-    panel_entries.append(_group_box("Analysis preview", analysis_widgets))
-    panel_entries.append(nav_row)
+        finish_entries.append(action_buttons['w'])
+    finish_entries += [_hint(hint_close), nav_row]
+    panel_entries.append(_group_box("5. Save & continue", finish_entries))
 
     # ----- keep the keyboard working after clicking ---------------------------
     # The action buttons restore canvas focus themselves (see the loop above);
@@ -880,14 +926,22 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
             _widget.called.connect(lambda *_: _focus_canvas())
 
     # ----- dock the panel as a single stacked column --------------------------
+    # Five boxes are taller than a laptop screen can show, and napari's dock
+    # does not scroll by itself, so the column goes in a QScrollArea rather than
+    # being squashed. `add_vertical_stretch` (on by default) keeps the boxes at
+    # their natural height inside it.
     tools_panel = QWidget()
     tools_layout = QVBoxLayout(tools_panel)
     tools_layout.setContentsMargins(6, 6, 6, 6)
     tools_layout.setSpacing(6)
     for entry in panel_entries:
         tools_layout.addWidget(entry if isinstance(entry, QWidget) else entry.native)
-    tools_layout.addStretch()  # keep the boxes at their natural height
-    viewer.window.add_dock_widget(tools_panel, name="Tools")
+
+    tools_scroll = QScrollArea()
+    tools_scroll.setWidget(tools_panel)
+    tools_scroll.setWidgetResizable(True)   # panel follows the dock's width
+    tools_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+    viewer.window.add_dock_widget(tools_scroll, name="Tools")
 
     # ----- restore persisted session state ------------------------------------
     shift_widget.shift_x.value = session_state.shift_x

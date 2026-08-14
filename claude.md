@@ -211,14 +211,19 @@ stored parameter `prepr_info` in the segfile contains the cropping information.
   the top of the Tools panel instead. Every button hands keyboard focus back to
   the canvas when it is done (`_focus_canvas`), otherwise focus stays in a
   spinbox and the shortcuts appear to stop working.
-- The Tools panel is stacked in a plain `QVBoxLayout`, not a magicgui
-  `Container`, because it mixes magicgui widgets with `QGroupBox` sections
-  ("Improve segmentation", "Analysis preview") that group inputs with the button
-  they feed. napari's stylesheet themes `QGroupBox` already, so don't style it.
-  Add a section with the local `_group_box(title, widgets)` helper and append it
-  to `panel_entries`; entries may be either magicgui widgets or raw QWidgets.
-  Widgets inside a box are no longer in `panel_entries`, so the focus-restore
-  loop lists them explicitly — extend that list when adding one.
+- The Tools panel is stacked in a plain `QVBoxLayout` inside a `QScrollArea`,
+  not a magicgui `Container`, because it mixes magicgui widgets with `QGroupBox`
+  sections and is taller (~860px) than a laptop screen; napari's dock does not
+  scroll by itself. Sections are numbered in the order a plate is worked
+  through: 1. View, 2. Plate area, 3. Improve segmentation, 4. Analysis preview,
+  5. Save & continue. Each holds its own inputs, button *and* hint, so hints sit
+  next to what they describe rather than in one legend at the top.
+  Build one with the local `_group_box(title, entries)` helper (entries may be
+  magicgui widgets or raw QWidgets) and `_hint(text)` for the explanations —
+  italic rather than coloured, since napari has light and dark themes.
+  napari's stylesheet themes `QGroupBox` already, so don't style it.
+  Widgets inside a box are not in `panel_entries`, so the focus-restore loop
+  lists them explicitly — extend that list when adding one.
 
 
 ---
