@@ -79,6 +79,7 @@ current 1st file:
 [ ] CONTINUE WITH
     - documentation_technical.md (note "TO DO"s)
     - README.md
+    - (youtube movie giving "tour"?)
 
 (previously created some additional featuers in the napari GUI)
 
