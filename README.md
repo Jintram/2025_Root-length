@@ -381,7 +381,7 @@ With the code above `df_filelist` now is a dataframe with all files,
 and `metadata_toseg_filepath` holds the path where an excel with that information
 is saved (if any).
 
-#### Determine recteangles
+#### Determine ROI recteangles
 
 <img src="figures/screenshot_dish_artifacts.png" width=50%><br>
 ***Figure.** Non-plant segmentation artifacts due to the dish.*
@@ -408,7 +408,15 @@ As input, this requires the file list (`df_filelist` argument), where to find th
 (through `dir_inputfiles`), and the directory with the original image files
 (`dir_imagefiles`). 
 
+As mentioned, the resulting ROIs will be saved to the original seg files.
+They will be used automatically in the next steps of the pipeline and can
+be adjusted as well.
 
+#### Manually correct the segmentation masks
+
+(..)
+
+TO DO: CONTINUE WRITING HERE
 
 
 -----------------------------------------------------------------------------
