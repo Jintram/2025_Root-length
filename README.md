@@ -43,8 +43,9 @@ of the respective tissue.
 
 <img src="figures/root_length_skeleton.png" height=300><br>
 ***Figure.** Illustration of how length is determined. White and green
-outline the segmented root and shoot length respectively. Yellow, red
-and grey lines show the plant skeleton. The red part is the longest path
+outline the segmented root and shoot respectively. Yellow, red
+and grey lines show the [topological skeleton](https://en.wikipedia.org/wiki/Topological_skeleton). 
+The red part is the longest path
 belonging to root tissue. Root length is determined from the red part,
 based on pixel-to-pixel distances.*
 
