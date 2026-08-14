@@ -40,7 +40,7 @@ from qtpy.QtWidgets import (QAbstractSpinBox, QApplication, QCheckBox,
 
 import napari
 
-import root_length.functions_pipeline.edit_segfiles as edseg
+import root_length.functions_pipeline.edit_segfiles as pl_edit
 
 
 ################################################################################
@@ -143,7 +143,7 @@ def open_editor(monkeypatch, curr_file, on_open=None):
     monkeypatch.setattr(napari, 'Viewer', make_viewer)
     monkeypatch.setattr(napari, 'run', fake_run)
 
-    result = edseg.edit_annotation_napari(
+    result = pl_edit.edit_annotation_napari(
         np.zeros((60, 80), dtype=np.uint8), _make_labels(),
         curr_file=curr_file, mask_rect=(5, 55, 5, 75))
 
@@ -410,7 +410,7 @@ def test_r_key_draws_at_the_cursor(monkeypatch):
         seen['rowcol'] = (row, col)
         return mask
 
-    monkeypatch.setattr(edseg, 'correct_mask_rootshootline', fake_correct)
+    monkeypatch.setattr(pl_edit, 'correct_mask_rootshootline', fake_correct)
 
     def press_r(viewer, panel):
         viewer.keymap['r'](viewer)

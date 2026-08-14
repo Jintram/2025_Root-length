@@ -6,11 +6,11 @@ import os
 
 import numpy as np
 from skimage import morphology
-import root_length.custom_functions.remove_large_objects as cflo
+import root_length.custom_functions.remove_large_objects as pl_rmlarge
 from skimage.measure import label, regionprops
 
 from matplotlib import pyplot as plt
-import root_length.functions_pipeline.utils as plutils
+import root_length.functions_pipeline.utils as pl_utils
 
 # %matplotlib inline
 # %matplotlib qt
@@ -113,7 +113,7 @@ def clean_mask(img_mask):
     # remove small objects from the mask
     img_mask_cleaned = morphology.remove_small_objects(img_mask_binary, min_size=MIN_SIZE)
     # remove large objects from the mask
-    img_mask_cleaned = cflo.remove_large_objects(img_mask_cleaned, max_size=MAX_SIZE)
+    img_mask_cleaned = pl_rmlarge.remove_large_objects(img_mask_cleaned, max_size=MAX_SIZE)
     # plt.imshow(img_mask_cleaned)
 
     # now clean the original mask with labels
@@ -132,7 +132,7 @@ def clean_mask(img_mask):
 
 def plot_bboxes(img_mask, img_bboxes):
     
-    plt.imshow(img_mask, cmap=plutils.cmap_plantclasses)
+    plt.imshow(img_mask, cmap=pl_utils.cmap_plantclasses)
     
     for bbox in img_bboxes:
         minr, minc, maxr, maxc = bbox.bbox
@@ -243,7 +243,7 @@ def plot_separate_plants(list_img_isolatedplants, lbl_count, nr_to_plot = 10):
     
     for i, img in enumerate(list_img_isolatedplants_toplot):
         if img is not None:
-            axes_flt[i].imshow(img, cmap=plutils.cmap_plantclasses)
+            axes_flt[i].imshow(img, cmap=pl_utils.cmap_plantclasses)
             axes_flt[i].set_title(f"Count: {lbl_count[i]}")
         else:
             axes_flt[i].axis('off')
@@ -263,7 +263,7 @@ def plot_mask_and_bboxes(labeled_mask, the_rprops, curr_file=None):
     plt.figure(figsize=(10/2.54, 10/2.54))
     
     # plot the plate
-    plt.imshow(labeled_mask, cmap=plutils.cmap_plantclasses)
+    plt.imshow(labeled_mask, cmap=pl_utils.cmap_plantclasses)
     
     for idx, rprop in enumerate(the_rprops):
         minr, minc, maxr, maxc = rprop.bbox

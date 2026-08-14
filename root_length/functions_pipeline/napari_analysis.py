@@ -21,10 +21,10 @@ import numpy as np
 from magicgui import magicgui
 from napari.utils.colormaps import DirectLabelColormap
 
-import root_length.functions_pipeline.analyze_plate as plana
-    # import importlib; importlib.reload(plana)
-import root_length.functions_pipeline.determine_length as pllen
-    # import importlib; importlib.reload(pllen)
+import root_length.functions_pipeline.analyze_plate as pl_analyze
+    # import importlib; importlib.reload(pl_analyze)
+import root_length.functions_pipeline.determine_length as pl_len
+    # import importlib; importlib.reload(pl_len)
 from root_length.functions_pipeline.config import ConfigPipeline
 
 
@@ -80,7 +80,7 @@ def add_analysis_layers(viewer, plant_results, shape):
 
     # the traced centerlines of all plants, in one label image
     traces_layer = viewer.add_labels(
-        pllen.project_results_to_full_image(plant_results, shape),
+        pl_len.project_results_to_full_image(plant_results, shape),
         name=LAYER_NAME_TRACES, colormap=TRACES_COLORMAP, opacity=1.0)
 
     # a box per plant, labeled with the lengths that were found for it
@@ -157,7 +157,7 @@ def make_analysis_widgets(viewer, get_labels):
         print("____\nAnalyzing plate — the viewer is unresponsive until this ends.")
         img_mask = get_labels()
         try:
-            _, plant_results = plana.analyze_labels(img_mask, LAST_CONFIG)
+            _, plant_results = pl_analyze.analyze_labels(img_mask, LAST_CONFIG)
         except Exception:
             traceback.print_exc()
             print("  Analysis FAILED (see traceback above), layers not updated.\n____")

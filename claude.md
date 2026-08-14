@@ -134,6 +134,28 @@ This repo runs in `cheeky-all` conda env, ie `conda activate cheeky-all`.
 - Module imports in pipeline scripts often include a commented
   `# import importlib; importlib.reload(...)` line — this is intentional for
   interactive (Spyder / Jupyter) development.
+- Every `root_length` module is imported under a fixed `pl_*` alias, so that
+  prefix marks "this call goes into our own package" and `grep pl_` finds all
+  of them. Use these, everywhere, and add to the list when a module is added:
+
+  | module | alias |
+  |---|---|
+  | `functions_files.filelisting` | `pl_flist` |
+  | `functions_pipeline.analyze_plate` | `pl_analyze` |
+  | `functions_pipeline.edit_segfiles` | `pl_edit` |
+  | `functions_pipeline.determine_length` | `pl_len` |
+  | `functions_pipeline.determine_length_moreplots` | `pl_lenplots` |
+  | `functions_pipeline.preprocessing` | `pl_prep` |
+  | `functions_pipeline.preprocessing_seg` | `pl_prepseg` |
+  | `functions_pipeline.config` | `pl_config` |
+  | `functions_pipeline.napari_analysis` | `pl_napana` |
+  | `functions_pipeline.utils` | `pl_utils` |
+  | `custom_functions.remove_large_objects` | `pl_rmlarge` |
+  | `custom_functions.custom_mask_action` | `pl_maskact` |
+
+  `ConfigPipeline` is the exception that stays a `from ... import`, since it is
+  a single name used as a bare type. Aliases for *external* libraries (e.g.
+  `pp_ara` for cheeky_cells' preprocessing) are unrelated to this scheme.
 
 ---
 

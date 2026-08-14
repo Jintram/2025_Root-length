@@ -25,7 +25,7 @@ from skimage.measure import label, regionprops
 from matplotlib import pyplot as plt
 from matplotlib.colors import ListedColormap
 
-import root_length.functions_pipeline.utils as plutils
+import root_length.functions_pipeline.utils as pl_utils
 from root_length.functions_pipeline.config import ConfigPipeline
 
 # Sums the 8 neighbors around one pixel
@@ -718,7 +718,7 @@ def plot_original_and_length(sample: TissueSample, plant_mask: np.ndarray | None
 
     # Show original plant mask (or fall back to the tissue mask)
     background = plant_mask if plant_mask is not None else sample.mask
-    axs[0].imshow(background, cmap=plutils.cmap_plantclasses)
+    axs[0].imshow(background, cmap=pl_utils.cmap_plantclasses)
 
     # Overlay the skeleton, colored in blue
     axs[0].imshow(sample.skeleton, cmap=ListedColormap(['none', 'blue']),
@@ -730,7 +730,7 @@ def plot_original_and_length(sample: TissueSample, plant_mask: np.ndarray | None
 
     # Now same but zoomed to the tissue bbox
     r0, c0, r1, c1 = return_bbox_foreground(sample.mask)
-    axs[1].imshow(sample.mask[r0:r1, c0:c1], cmap=ListedColormap(['black', plutils.custom_colors_plantclasses[2]]))
+    axs[1].imshow(sample.mask[r0:r1, c0:c1], cmap=ListedColormap(['black', pl_utils.custom_colors_plantclasses[2]]))
     axs[1].imshow(sample.skeleton[r0:r1, c0:c1], cmap=ListedColormap(['none', 'blue']),
                 alpha=(sample.skeleton[r0:r1, c0:c1] > 0) * 1.0)
     axs[1].imshow(sample.mask_longest_path[r0:r1, c0:c1], cmap=ListedColormap(["none", "red"]),
@@ -853,7 +853,7 @@ def plot_all_plants_projected(
     """
     
     fig, ax = plt.subplots(figsize=figsize)
-    ax.imshow(sample_image, cmap=plutils.cmap_plantclasses)
+    ax.imshow(sample_image, cmap=pl_utils.cmap_plantclasses)
     #ax.set_title("All plants projected on sample image", fontsize=13, pad=10)
     #ax.axis("off")
 

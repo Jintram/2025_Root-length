@@ -20,14 +20,14 @@ import pandas as pd
 from matplotlib import pyplot as plt
 
 # load custom scripts
-import root_length.functions_pipeline.utils as plutils
-    # import importlib; importlib.reload(plutils)
-import root_length.functions_pipeline.preprocessing as plprep
-    # import importlib; importlib.reload(plprep)
-import root_length.functions_pipeline.determine_length as pllen
-    # import importlib; importlib.reload(pllen)
-import root_length.functions_files.filelisting as ffl
-    # import importlib; importlib.reload(ffl)
+import root_length.functions_pipeline.utils as pl_utils
+    # import importlib; importlib.reload(pl_utils)
+import root_length.functions_pipeline.preprocessing as pl_prep
+    # import importlib; importlib.reload(pl_prep)
+import root_length.functions_pipeline.determine_length as pl_len
+    # import importlib; importlib.reload(pl_len)
+import root_length.functions_files.filelisting as pl_flist
+    # import importlib; importlib.reload(pl_flist)
 from root_length.functions_pipeline.config import ConfigPipeline
     
 
@@ -38,7 +38,7 @@ def identify_plants(img_mask_clean):
         
     # Find the separate regions of interest corresponding to individual plants
     list_img_indivplants, img_mask_bbox_lblcount, img_mask_rprops = \
-        plprep.find_individual_plants(img_mask_clean)
+        pl_prep.find_individual_plants(img_mask_clean)
     
     # Now determine the selection of QC passed plants
     sel_plants = \
@@ -68,7 +68,7 @@ def analyze_labels(img_mask, config_pipeline):
     """
 
     # Clean the mask
-    img_mask_clean = plprep.clean_mask(img_mask)
+    img_mask_clean = pl_prep.clean_mask(img_mask)
         # plt.imshow(img_mask)
         # plt.imshow(img_mask_clean)
     
@@ -78,7 +78,7 @@ def analyze_labels(img_mask, config_pipeline):
     
     # Plot overview
     # %matplotlib qt
-    # plprep.plot_mask_and_bboxes(labeled_mask=img_mask_clean,the_rprops=img_mask_rprops[sel_plants],curr_file=curr_file)
+    # pl_prep.plot_mask_and_bboxes(labeled_mask=img_mask_clean,the_rprops=img_mask_rprops[sel_plants],curr_file=curr_file)
 
     # Build PlantSample objects for each QC-passed plant
     current_sample_all_plants = []
@@ -91,17 +91,17 @@ def analyze_labels(img_mask, config_pipeline):
         original_bbox = \
             np.array(img_mask_rprops)[sel_plants][idx].bbox
 
-        root_tissue = pllen.TissueSample(
+        root_tissue = pl_len.TissueSample(
             mask=root_mask,
             anchor_mask=shoot_mask,
         )
-        shoot_tissue = pllen.TissueSample(
+        shoot_tissue = pl_len.TissueSample(
             mask=shoot_mask,
             anchor_mask=root_mask,
         )
 
         current_sample_all_plants.append(
-            pllen.PlantSample(
+            pl_len.PlantSample(
                 root=root_tissue,
                 shoot=shoot_tissue,
                 plant_mask=plant_mask,
@@ -120,7 +120,7 @@ def analyze_labels(img_mask, config_pipeline):
         # Perform calculations based on this plant mask
         # and store the result in the same "plant container"
         current_sample_all_plants[i] = \
-            pllen.run_default_length_pipeline(
+            pl_len.run_default_length_pipeline(
                 plant = sample, 
                 config_pipeline=config_pipeline)
         
@@ -143,9 +143,9 @@ def analyze_plate(curr_file, config_pipeline):
     # Applied here (before anything else) so that the plant selection, the
     # output table and the overview plot below all see the same mask.
     if config_pipeline.apply_mask_rect and ('mask_rect' in segfile_data.files):
-        mask_rect = plprep.normalize_rect(segfile_data['mask_rect'], img_mask.shape)
+        mask_rect = pl_prep.normalize_rect(segfile_data['mask_rect'], img_mask.shape)
         n_labeled_before = np.count_nonzero(img_mask)
-        img_mask = plprep.apply_mask_rect(img_mask, mask_rect)
+        img_mask = pl_prep.apply_mask_rect(img_mask, mask_rect)
         print(f"Applied mask_rect {mask_rect}: dropped "
               f"{n_labeled_before - np.count_nonzero(img_mask)} labeled pixels.")
 
@@ -161,7 +161,7 @@ def analyze_plate(curr_file, config_pipeline):
         
     # Now plot the result
     fig, ax = \
-        pllen.plot_all_plants_projected(
+        pl_len.plot_all_plants_projected(
                 sample_image = img_mask,
                 plant_results = current_sample_all_plants)
     # and save
@@ -218,7 +218,7 @@ def analyze_all_plates(df_filelist, output_dir, config_pipeline=None):
         # get file info
         basedir, subdir, filename = \
             df_filelist.loc[file_idx,['basedir', 'subdir', 'filename']]
-        curr_file = ffl.fileinfo(basedir, subdir, filename, output_dir)
+        curr_file = pl_flist.fileinfo(basedir, subdir, filename, output_dir)
         
         print("========================================================")
         print(f"Processing file {file_idx+1}/{len(df_filelist)}: {curr_file.fullpath}")
@@ -241,7 +241,7 @@ def generate_df_all(df_filelist, datadir):
         # get current file info
         basedir, subdir, filename = \
             df_filelist.loc[file_idx, ['basedir', 'subdir', 'filename']]
-        curr_file = ffl.fileinfo(basedir, subdir, filename, datadir)
+        curr_file = pl_flist.fileinfo(basedir, subdir, filename, datadir)
         # specific info to load
         filename_data = curr_file.filebasename + "_lengths.tsv"
         filepath = os.path.join(

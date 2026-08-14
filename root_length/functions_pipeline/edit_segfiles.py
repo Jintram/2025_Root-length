@@ -38,18 +38,18 @@ import napari
 from magicgui import magicgui
 from magicgui.widgets import PushButton
 
-import root_length.functions_files.filelisting as ffl
-    # import importlib; importlib.reload(ffl)
-import root_length.custom_functions.custom_mask_action as cfca
-    # import importlib; importlib.reload(cfca)
-import root_length.functions_pipeline.utils as plutils
-    # import importlib; importlib.reload(plutils)
-import root_length.functions_pipeline.preprocessing_seg as plprep_seg
-    # import importlib; importlib.reload(plprep_seg)
-import root_length.functions_pipeline.preprocessing as plprep
-    # import importlib; importlib.reload(plprep)
-import root_length.functions_pipeline.napari_analysis as plnapana
-    # import importlib; importlib.reload(plnapana)
+import root_length.functions_files.filelisting as pl_flist
+    # import importlib; importlib.reload(pl_flist)
+import root_length.custom_functions.custom_mask_action as pl_maskact
+    # import importlib; importlib.reload(pl_maskact)
+import root_length.functions_pipeline.utils as pl_utils
+    # import importlib; importlib.reload(pl_utils)
+import root_length.functions_pipeline.preprocessing_seg as pl_prepseg
+    # import importlib; importlib.reload(pl_prepseg)
+import root_length.functions_pipeline.preprocessing as pl_prep
+    # import importlib; importlib.reload(pl_prep)
+import root_length.functions_pipeline.napari_analysis as pl_napana
+    # import importlib; importlib.reload(pl_napana)
 
 import skimage.io as skio
 from skimage.draw import line
@@ -555,7 +555,7 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     # to later (`_rect_from_layer()`), because this is the one that determines
     # which part of the labels was shown, and hence which part may be replaced
     # when saving.
-    rect_at_load = plprep.normalize_rect(mask_rect, segmentation.shape)
+    rect_at_load = pl_prep.normalize_rect(mask_rect, segmentation.shape)
 
     # (the user-facing key/button overview is printed further down, where the
     # ACTIONS table that it is generated from is defined)
@@ -598,7 +598,7 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
         labels_kwargs['colormap'] = mylabelcolormap
     # Only the plate area is shown, so that this is what analyze_plate sees too
     labels_layer = viewer.add_labels(
-        plprep.apply_mask_rect(segmentation, rect_at_load), **labels_kwargs)
+        pl_prep.apply_mask_rect(segmentation, rect_at_load), **labels_kwargs)
 
     # ----- overlay: editable mask_rect rectangle ------------------------------
     # Also added when there is no rect yet, so a plate area can be drawn from
@@ -637,12 +637,12 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
                   "layer, using the first one.")
         corners = np.asarray(rect_layer.data[0])
         rows, cols = corners[:, -2], corners[:, -1]
-        return plprep.normalize_rect(
+        return pl_prep.normalize_rect(
             (rows.min(), rows.max(), cols.min(), cols.max()), segmentation.shape)
 
     def _labels_for_save():
         """The complete labels again, with the edited plate area pasted in."""
-        return plprep.paste_inside_rect(labels_layer.data, segmentation,
+        return pl_prep.paste_inside_rect(labels_layer.data, segmentation,
                                         rect_at_load)
 
     def _save_now():
@@ -836,9 +836,9 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     # result layers) out of this file. It is handed the labels as they are on
     # screen, cropped to the rectangle as it is *now* rather than as it was on
     # opening, so that a dragged rectangle takes effect without a reload.
-    analysis_widgets = plnapana.make_analysis_widgets(
+    analysis_widgets = pl_napana.make_analysis_widgets(
         viewer,
-        lambda: plprep.apply_mask_rect(labels_layer.data, _rect_from_layer()))
+        lambda: pl_prep.apply_mask_rect(labels_layer.data, _rect_from_layer()))
 
     # ----- assemble the tools panel -------------------------------------------
     # The panel is ordered the way a plate is worked through: line up the view,
@@ -1138,7 +1138,7 @@ def edit_segfile_single(curr_file, dir_imagefiles=None, session_state=None):
     seg_data, mask_rect, return_requests = edit_annotation_napari(
         image=img_original,
         segmentation=img_mask,
-        mylabelcolormap=plutils.custom_colors_plantclasses,
+        mylabelcolormap=pl_utils.custom_colors_plantclasses,
         title=f"Editing #{curr_file.file_idx+1}: {curr_file.filename} ({curr_file.subdir})",
         session_state=session_state,
         curr_file=curr_file,
@@ -1188,7 +1188,7 @@ def edit_all_segfiles(df_filelist, dir_inputfiles, dir_imagefiles=None,
         # Get file info
         basedir, subdir, filename = \
             df_filelist.loc[file_idx, ['basedir', 'subdir', 'filename']]
-        curr_file = ffl.fileinfo(basedir, subdir, filename, dir_inputfiles,
+        curr_file = pl_flist.fileinfo(basedir, subdir, filename, dir_inputfiles,
                                  file_idx = file_idx)
 
         print("========================================================")
@@ -1265,7 +1265,7 @@ def compute_and_save_mask_rect_all(df_filelist, dir_inputfiles, dir_imagefiles,
     for file_idx in range(n_files):
         basedir, subdir, filename = \
             df_filelist.loc[file_idx, ['basedir', 'subdir', 'filename']]
-        curr_file = ffl.fileinfo(basedir, subdir, filename, dir_inputfiles)
+        curr_file = pl_flist.fileinfo(basedir, subdir, filename, dir_inputfiles)
 
         print(f"[{file_idx+1}/{n_files}] {curr_file.fullpath}")
 
@@ -1303,7 +1303,7 @@ def compute_and_save_mask_rect_all(df_filelist, dir_inputfiles, dir_imagefiles,
             img_original = img_original[minr:maxr, minc:maxc]
 
         # Compute the rect
-        _, rect = plprep_seg.preprocess_getbbox_insideplate2(
+        _, rect = pl_prepseg.preprocess_getbbox_insideplate2(
             img_original,
             margin_left=margin_left, margin_right=margin_right,
             margin_top=margin_top, margin_bottom=margin_bottom,
@@ -1312,7 +1312,7 @@ def compute_and_save_mask_rect_all(df_filelist, dir_inputfiles, dir_imagefiles,
         # Optionally clear seg labels outside the rect
         seg = existing['img_pred_lbls']
         if clear_outside_mask:
-            seg = plprep.apply_mask_rect(seg, plprep.normalize_rect(rect, seg.shape))
+            seg = pl_prep.apply_mask_rect(seg, pl_prep.normalize_rect(rect, seg.shape))
             print("  Cleared seg labels outside rect.")
 
         # Save (other keys, eg prepr_info, are preserved by _save_segfile)

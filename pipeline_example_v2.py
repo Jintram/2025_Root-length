@@ -4,12 +4,12 @@
 
 import os
 
-import root_length.functions_files.filelisting as ffl
-    # import importlib; importlib.reload(ffl)
-import root_length.functions_pipeline.analyze_plate as plap
-    # import importlib; importlib.reload(plap)
-import root_length.functions_pipeline.edit_segfiles as pledit
-    # import importlib; importlib.reload(pledit)
+import root_length.functions_files.filelisting as pl_flist
+    # import importlib; importlib.reload(pl_flist)
+import root_length.functions_pipeline.analyze_plate as pl_analyze
+    # import importlib; importlib.reload(pl_analyze)
+import root_length.functions_pipeline.edit_segfiles as pl_edit
+    # import importlib; importlib.reload(pl_edit)
 
 ################################################################################
 # %% Gather the file list df.
@@ -25,12 +25,11 @@ DIR_IMAGEFILES = '/Users/m.wehrens/Data_notbacked/2025_hypocotyl_images/DATA/'
 # DIR_INPUTFILES = '/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/SELECTION_ML/model_seg/segfiles/'
 # DIR_OUTPUTFILES = '/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/SELECTION_ML/model_seg/segfiles/test/'
 
-import root_length.functions_files.filelisting as gfl
-    # import importlib; importlib.reload(gfl)
+# import importlib; importlib.reload(pl_flist)
 
 # Generate list of files to analyze
 df_filelist, metadata_toseg_filepath = \
-    gfl.gen_metadatafile_segfiles(
+    pl_flist.gen_metadatafile_segfiles(
         directory_inputfiles=DIR_INPUTFILES,
         directory_outputfiles=DIR_OUTPUTFILES,
     )
@@ -41,9 +40,9 @@ df_filelist, metadata_toseg_filepath = \
 # The rect can be corrected by hand in the napari editor below; the analysis
 # ignores labels outside it when loading, so nothing needs clearing here.
 
-# import importlib; importlib.reload(pledit)
+# import importlib; importlib.reload(pl_edit)
 
-pledit.compute_and_save_mask_rect_all(
+pl_edit.compute_and_save_mask_rect_all(
     df_filelist=df_filelist,
     dir_inputfiles=DIR_INPUTFILES,
     dir_imagefiles=DIR_IMAGEFILES,
@@ -59,9 +58,9 @@ pledit.compute_and_save_mask_rect_all(
 # DIR_IMAGEFILES = '/Users/m.wehrens/Data_UVA/2025_10_hypocotyl-root-length/SELECTION_ML/Originals/' 
 
 # for debugging:
-# import importlib; importlib.reload(pledit)
+# import importlib; importlib.reload(pl_edit)
 
-pledit.edit_all_segfiles(df_filelist=df_filelist,
+pl_edit.edit_all_segfiles(df_filelist=df_filelist,
                          dir_inputfiles=DIR_INPUTFILES,
                          dir_imagefiles=DIR_IMAGEFILES)
 
@@ -74,11 +73,11 @@ pledit.edit_all_segfiles(df_filelist=df_filelist,
 
 ################################################################################
 # %% Run the analysis
-plap.analyze_all_plates(df_filelist=df_filelist,
+pl_analyze.analyze_all_plates(df_filelist=df_filelist,
                         output_dir=DIR_OUTPUTFILES)
 
 # Now make one big overview dataframe
-plap.generate_df_all(df_filelist, DIR_OUTPUTFILES)
+pl_analyze.generate_df_all(df_filelist, DIR_OUTPUTFILES)
 
 
 
