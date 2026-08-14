@@ -43,6 +43,9 @@ package.
                         - rect `r0, c0, r1, c1` is returned
                     - use full pic if rect `< min_expected_area`.
                     - add margins (allowed in `%` or `px`)
+            - **artifact/legacy** optionally, outside mask zeroed; not meant as standard practice as 
+            whole pipeline will understand the stored `mask_rect`
+             - `_save_segfile()` is used to store the mask (`mask_rect`) in original segfile
                     
 
 <img src="figures/technical/plate_detection_1getbbox2.png" width=50%><br>
