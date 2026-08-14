@@ -37,7 +37,7 @@ def bbox_from_mask_light(mask: np.ndarray):
     # Project the 2D mask on X or Y (for efficiency)
     rows_any = mask.any(axis=1)
     cols_any = mask.any(axis=0)
-        # plt.plot(range(len(rows_any)), rows_any)
+        # plt.plot(range(len(rows_any)), rows_any); plt.title("np.any() projection of mask on 1d"); plt.show()
 
     if not rows_any.any():
         return None

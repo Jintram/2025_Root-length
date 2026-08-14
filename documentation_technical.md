@@ -35,9 +35,20 @@ package.
                 covers the agar but not artifacts (margins are added). strategy;
                     - takes 50th percentile of grayscale img
                         - assumes to be agar background levels
-                    - 
+                        - thus includes edges (bright)
+                        - **completely** excludes background at side
+                    - calls `bbox_from_mask_light()`
+                        - mask is projected to 1d for x and y using `any()`
+                        - first and last non-zero elements are taken as boundary
+                        - rect `r0, c0, r1, c1` is returned
+                    - use full pic if rect `< min_expected_area`.
+                    - add margins (allowed in `%` or `px`)
                     
 
-<img src="figures/technical/plate_detection_getbbox2.png" width=50%><br>
+<img src="figures/technical/plate_detection_1getbbox2.png" width=50%><br>
 ***Figure.** Thresholded image by 50th percentile.*
+
+<img src="figures/technical/plate_detection_2flatmask.png" width=50%><br>
+***Figure.** Resulting mask projected on 1d.*
+
 
