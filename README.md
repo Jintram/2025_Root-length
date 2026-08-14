@@ -2,32 +2,31 @@
 
 --------------------------------------------------------------------------------
 
-# Quantifying root length
+# Quantifying plant root & shoot lengths
 
 --------------------------------------------------------------------------------
 
 ## Project description
 
-Color images of plants were taken using a scanner (a basic consumer model), with the aim of determining root lenghts
-from these color pictures.
+Color images of plants were taken using a scanner (a basic consumer model), 
+with the aim of determining root and shoot lenghts from these color pictures.
 
-The scripts here 
+### Part 1 segments plants
 
-1. Uses machine learning scripts (from the package [Cheeky-cells](https://github.com/Jintram/Cheeky-cells/), a set of scripts that allow training and 
+We use machine learning scripts (from the package [Cheeky-cells](https://github.com/Jintram/Cheeky-cells/), a set of scripts that allow training and 
 segmenting of images) to segment the plant images.
-2. Use segmentation files as input to determine the length of each plant.
 
-The image below shows the segmentation of the plants:<br>
+Example image:<br>
 <img src="figures/example_plant_segmentation.png" width=50%>
 
+
+### Part 2 quantifies root & shoot lengths
+
+It uses segmentation files from part 1 as input to determine the length of the root and shoot from each plant.
 The image below shows the length measurement of a plant:<br>
-<img src="figures/screenshot_plant-analysis.png" width=50%>
-
-
+<img src="figures/screenshot_plant-analysis.png" width=50%><br>
 **Image description:** *White is the root, green is the shoot, brown is the seed, and dark green are leaves (as determined by 
 the segmentation).*
-
-We want to determine the size of the root and the size of the shoot.
 
 --------------------------------------------------------------------------------
 
