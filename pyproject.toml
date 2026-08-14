@@ -5,6 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "root-length"
 version = "0.1.0"
+license = {file = "LICENSE"}
 
 [tool.setuptools.packages.find]
 include = ["root_length*"]
