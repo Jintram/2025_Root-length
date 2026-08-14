@@ -77,6 +77,15 @@ Then, you need to run the following command (replace `/path/to/script/directory`
 pip install -e /path/to/script/directory
 ```
 
+
+--------------------------------------------------------------------------------
+
+# Technical script structure & rationale
+
+--------------------------------------------------------------------------------
+
+See the file [documentation_technical.md](documentation_technical.md)
+
 --------------------------------------------------------------------------------
 
 # How to use
