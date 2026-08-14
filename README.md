@@ -28,10 +28,10 @@ segmented properly.*
 
 We use the segmentation files from part 1 as input to determine the length of the root and shoot from each plant.
 
-<img src="figures/screenshot_plant-analysis.png" width=50%>
+<img src="figures/screenshot_plant-analysis.png" width=50%><br>
 ***Figure.** Example of length measurements.*
 
-<img src="figures/GUI_napari_screenshot.png" width=50%>
+<img src="figures/GUI_napari_screenshot.png" width=50%><br>
 ***Figure.** Screenshot of the GUI that allows manual corrections to 
 the segmentation using a customized Napari window. It also includes a preview
 of the length analysis result.*
