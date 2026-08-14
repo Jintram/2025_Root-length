@@ -5,18 +5,6 @@
 ### Quantifying root length
 
 
-## Setup
-
-I'm using the same environment as the [Cheeky_cells](https://github.com/Jintram/Cheeky-cells) package
-to run these scripts. For installation instructions of that environment,
-[see that repository](https://github.com/Jintram/Cheeky-cells).
-
-```
-conda activate cheeky-all
-```
-
-
-
 ## Project description
 
 Color images of plants were taken using a scanner (a basic consumer model), with the aim of determining root lenghts
@@ -39,6 +27,40 @@ The image below shows the length measurement of a plant:
 the segmentation).*
 
 We want to determine the size of the root and the size of the shoot.
+
+
+## Setup
+
+I'm using the same environment as the [Cheeky_cells](https://github.com/Jintram/Cheeky-cells) package
+to run these scripts. For installation instructions of that environment,
+[see that repository](https://github.com/Jintram/Cheeky-cells).
+
+```
+conda activate cheeky-all
+```
+
+### Download the scripts
+
+To use them, you will need to put the scripts in this repository on your computer.
+
+You can download them using the green "<> Code" button at the right top, and press "download zip".
+
+A more advanced option is to set up git and clone the repository to your local computer, see below.
+
+```
+# Navigate to the directory you'd like to install the scripts
+cd /path/to/your/directory
+
+# Clone the repository using git
+git clone git@github.com:Jintram/2025_Root-length.git
+cd 2025_Root-length
+```
+
+Then, you need to run the following command (replace `/path/to/script/directory` by the actual path):
+
+```
+pip install -e /path/to/script/directory
+```
 
 ## Workflow and input/output directories
 
