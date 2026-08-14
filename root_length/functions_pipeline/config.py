@@ -16,7 +16,8 @@ from dataclasses import dataclass
 
 @dataclass
 class ConfigPipeline:
-    smoothing_diskradius: int | None = None
+    # disk radius for smoothing the mask before skeletonizing; None switches it off
+    smoothing_diskradius: int | None = 5
     # derive root and shoot centerlines from one shared skeleton
     shared_skeleton_flag: bool = True
     # largest dilation radius allowed to bridge holes in the root+shoot mask

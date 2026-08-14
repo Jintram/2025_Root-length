@@ -221,6 +221,9 @@ stored parameter `prepr_info` in the segfile contains the cropping information.
   Build one with the local `_group_box(title, entries)` helper (entries may be
   magicgui widgets or raw QWidgets) and `_hint(text)` for the explanations —
   italic rather than coloured, since napari has light and dark themes.
+  A `None` entry is skipped, so an unwanted hint (`hint_view = None`) or an
+  optional button (`action_buttons.get('w')`, `reload_widget`) is expressed in
+  the list itself rather than by an `if` around the assembly.
   napari's stylesheet themes `QGroupBox` already, so don't style it.
   Widgets inside a box are not in `panel_entries`, so the focus-restore loop
   lists them explicitly — extend that list when adding one.

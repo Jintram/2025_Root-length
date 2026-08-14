@@ -662,10 +662,13 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     # (added to viewer below, using container)
     
     # ----- widget: remove small labeled regions --------------------------------
+    # `layout='horizontal'` puts the button next to its own input instead of on
+    # a line of its own, which both saves height and ties the two together.
     @magicgui(
         min_size={"widget_type": "SpinBox", "min": 1, "max": 100000, "value": 100,
                   "label": "Min area (px)"},
         call_button="Remove smaller",
+        layout='horizontal',
     )
     def remove_small_widget(min_size: int = 100):
         mask = labels_layer.data
@@ -679,6 +682,7 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
         min_size={"widget_type": "SpinBox", "min": 1, "max": 1000000, "value": 10000,
                   "label": "Max area (px)"},
         call_button="Remove larger",
+        layout='horizontal',
     )
     def remove_large_widget(min_size: int = 10000):
         mask = labels_layer.data
@@ -797,13 +801,12 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
     # own key. Note the close hint is about napari's own shortcut rather than
     # one of ours, but it is how a session actually moves along: nothing sets
     # `save_on_close` to False, so the labels are written and the loop goes on.
+    # Set a hint to None to leave it out (the panel is tall enough as it is).
     mouse_actions = [(k, c) for k, c, _, _, needs_mouse in ACTIONS if needs_mouse]
-    hint_view = "Moves the image only, to line it up with the labels."
-    hint_rect = ("Drag the red rectangle to set the area that gets measured; "
-                 "labels outside it are kept, not deleted.")
-    hint_mouse = ("Hover over a plant, then press:<br>" +
-                  "<br>".join(f"&nbsp;&nbsp;<b>{k}</b> &mdash; {c.lower()}"
-                              for k, c in mouse_actions))
+    hint_view = None  # "Moves the image only, to line it up with the labels."
+    hint_rect = None
+    hint_mouse = ("Press " + " or ".join(f"[{k}]" for k, _ in mouse_actions) +
+                  " (slightly different result) and then ..")
     hint_close = ("<b>Cmd+W / Ctrl+W</b> (or the window close button) saves "
                   "and goes to the next plate.")
 
@@ -854,11 +857,13 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
 
     def _hint(text):
         """
-        A wrapped line of explanation to put inside a box.
+        A wrapped line of explanation to put inside a box, or None for no hint.
 
         Set apart by italics rather than by a colour: napari ships light and
         dark themes, and a hard-coded grey would be unreadable in one of them.
         """
+        if text is None:
+            return None
         label = QLabel(text)
         label.setWordWrap(True)
         label.setStyleSheet("font-style: italic;")
@@ -872,8 +877,18 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
         A titled, bordered box around magicgui widgets and/or plain QWidgets.
 
         Mixing the two is the point: the hints are QLabels while the controls
-        come from magicgui.
+        come from magicgui. Entries that are None are left out, so an optional
+        hint (`hint_x = None`) or an optional button reads as one list rather
+        than as an `if` around the assembly.
+
+        Returns None when nothing survives, so a section whose contents are all
+        optional (plate area, when its hint is off and there is no file to
+        reload) disappears instead of showing an empty titled frame.
         """
+        entries = [entry for entry in entries if entry is not None]
+        if not entries:
+            return None
+
         box = QGroupBox(title)
         box.setLayout(QVBoxLayout())
         box.layout().setContentsMargins(6, 6, 6, 6)
@@ -884,36 +899,32 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
 
     # 1. Line up the image under the labels (a session-wide setting, so this is
     #    usually touched once, on the first plate).
-    panel_entries = [_group_box("1. View", [shift_widget, _hint(hint_view)])]
+    panel_entries = [_group_box("Shift layer view.", [shift_widget, _hint(hint_view)])]
 
     # 2. The plate area. There is no widget for the rectangle itself — it is
     #    dragged on the canvas — so the hint is the only thing that says so, and
-    #    the reload button next to it is how its effect is seen.
-    rect_entries = [_hint(hint_rect)]
-    if reload_widget is not None:
-        rect_entries.append(reload_widget)
-    panel_entries.append(_group_box("2. Plate area", rect_entries))
+    #    the reload button next to it is how its effect is seen. (That button is
+    #    None when there is no file loop to reload through.)
+    panel_entries.append(_group_box("Reload after adjusting red recteangle", [
+        _hint(hint_rect), reload_widget]))
 
     # 3. Fixing the mask: the size filters do a bulk pass, then r/t and 'u' are
     #    the per-plant fixes (and 'u' consumes the lines that r/t draw, so it
     #    comes after the hint that describes them).
-    panel_entries.append(_group_box("3. Improve segmentation", [
+    panel_entries.append(_group_box("Improve segmentation", [
         remove_small_widget, remove_large_widget,
         _hint(hint_mouse), action_buttons['u']]))
 
     # 4. Check whether the correction did what was meant (writes nothing).
-    panel_entries.append(_group_box("4. Analysis preview", analysis_widgets))
+    panel_entries.append(_group_box("Analysis preview", analysis_widgets))
 
     # 5. Leaving the plate. Saving from within the viewer is only possible when
-    #    curr_file was given; otherwise the button is omitted and the caller
-    #    saves what we return.
+    #    curr_file was given; otherwise `action_buttons` has no 'w' entry, the
+    #    button is left out, and the caller saves what we return.
     nav_row = Container(layout='horizontal', labels=False,
                         widgets=[action_buttons[k] for k in ('j', 'n', 'q')])
-    finish_entries = []
-    if curr_file is not None:
-        finish_entries.append(action_buttons['w'])
-    finish_entries += [_hint(hint_close), nav_row]
-    panel_entries.append(_group_box("5. Save & continue", finish_entries))
+    panel_entries.append(_group_box("Navigation", [
+        action_buttons.get('w'), _hint(hint_close), nav_row]))
 
     # ----- keep the keyboard working after clicking ---------------------------
     # The action buttons restore canvas focus themselves (see the loop above);
@@ -926,15 +937,18 @@ def edit_annotation_napari(image, segmentation, mylabelcolormap=None,
             _widget.called.connect(lambda *_: _focus_canvas())
 
     # ----- dock the panel as a single stacked column --------------------------
-    # Five boxes are taller than a laptop screen can show, and napari's dock
+    # The stack of boxes can be taller than a laptop screen, and napari's dock
     # does not scroll by itself, so the column goes in a QScrollArea rather than
     # being squashed. `add_vertical_stretch` (on by default) keeps the boxes at
-    # their natural height inside it.
+    # their natural height inside it. None entries are skipped here too: an
+    # empty section builds as None (see `_group_box`).
     tools_panel = QWidget()
     tools_layout = QVBoxLayout(tools_panel)
     tools_layout.setContentsMargins(6, 6, 6, 6)
     tools_layout.setSpacing(6)
     for entry in panel_entries:
+        if entry is None:
+            continue
         tools_layout.addWidget(entry if isinstance(entry, QWidget) else entry.native)
 
     tools_scroll = QScrollArea()

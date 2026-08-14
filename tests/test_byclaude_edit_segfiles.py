@@ -14,9 +14,14 @@ Assumed behaviour pinned down here:
 - each button caption ends in "[<key>]", so it advertises its own shortcut
 - the r/t hint lists the mouse-position actions and nothing else, also when
   curr_file is None (where 'w' is buttonless but is not a mouse action)
-- the panel holds the five numbered sections, in workflow order
+- the panel holds five sections, in workflow order (identified by their
+  contents, not their titles, which are wording that gets tuned)
 - each button sits in the section for the step it belongs to
 - each hint sits in the box holding the controls it describes
+- a hint set to None (currently `hint_view`, `hint_rect`) is left out entirely,
+  and a section left with no contents at all is not built
+- the size-filter buttons sit on one row with their own spinbox
+- smoothing radius defaults to 5 pipeline-wide, and None stays a valid "off"
 - the regrouping lost nothing: all 9 buttons, 2 sliders, 6 spinboxes, 1 checkbox
 - the "Quit, no save [q]" button does what the 'q' key does
 - with curr_file=None there is no save button and no reload button, but all
@@ -149,8 +154,22 @@ def buttons_of(widget):
 
 
 def group_boxes_of(widget):
-    """{title: the group box} for every QGroupBox in a Qt widget tree."""
-    return {b.title(): b for b in widget.findChildren(QGroupBox)}
+    """Every QGroupBox in a Qt widget tree, top to bottom as laid out."""
+    return widget.findChildren(QGroupBox)
+
+
+def section_holding(widget, button_caption):
+    """
+    Index of the section whose box contains the given button.
+
+    Sections are found by content rather than by title, because the titles are
+    wording that gets tuned; what these tests are pinning down is which controls
+    end up together and in what order, not how the boxes are named.
+    """
+    for index, box in enumerate(group_boxes_of(widget)):
+        if button_caption in buttons_of(box):
+            return index
+    raise AssertionError(f"no section contains a {button_caption!r} button")
 
 
 ################################################################################
@@ -172,36 +191,43 @@ def test_button_captions_advertise_their_shortcut(monkeypatch):
         assert f"{caption} [{key}]" in captions
 
 
+def mouse_hint_of(panel):
+    """The hint naming the keys that act at the mouse position."""
+    return next(lbl.text() for lbl in panel.findChildren(QLabel)
+                if lbl.text().startswith('Press ['))
+
+
 def test_mouse_hint_lists_only_the_mouse_actions(monkeypatch):
-    """The r/t hint advertises those two actions and no others."""
+    """The hint names r and t, generated from ACTIONS rather than hardcoded."""
     _, panel, _ = open_editor(monkeypatch, FakeFile())
-    hint = next(lbl.text() for lbl in panel.findChildren(QLabel)
-                if 'Hover over a plant' in lbl.text())
-    assert 'draw root/shoot line' in hint
-    assert 'draw through-line' in hint
-    assert 'save now' not in hint.lower()
+    assert mouse_hint_of(panel) == \
+        'Press [r] or [t] (slightly different result) and then ..'
 
 
 def test_mouse_hint_excludes_buttonless_w_without_a_file(monkeypatch):
     """With curr_file=None, 'w' loses its button but is not a mouse action."""
     _, panel, _ = open_editor(monkeypatch, None)
-    hint = next(lbl.text() for lbl in panel.findChildren(QLabel)
-                if 'Hover over a plant' in lbl.text())
-    assert 'save now' not in hint.lower()
+    assert '[w]' not in mouse_hint_of(panel)
 
 
 ################################################################################
 # %% the panel layout
 
-SECTIONS = ['1. View', '2. Plate area', '3. Improve segmentation',
-            '4. Analysis preview', '5. Save & continue']
+N_SECTIONS = 5
 
 
 def test_sections_appear_in_workflow_order(monkeypatch):
-    """The five boxes are present and stacked in the order they are worked through."""
+    """The five boxes are stacked in the order a plate is worked through."""
     _, panel, _ = open_editor(monkeypatch, FakeFile())
-    titles = [box.title() for box in panel.findChildren(QGroupBox)]
-    assert titles == SECTIONS
+    assert len(group_boxes_of(panel)) == N_SECTIONS
+
+    # view (no button of its own) → plate area → fix mask → check → leave
+    assert (section_holding(panel, 'Save + reload plate (e.g. after adjusting rect)')
+            < section_holding(panel, 'Remove smaller')
+            < section_holding(panel, 'Preview analysis result')
+            < section_holding(panel, 'Quit, no save [q]'))
+    # the shift sliders are the first section, ahead of all of those
+    assert group_boxes_of(panel)[0].findChildren(QSlider)
 
 
 def test_each_control_sits_in_its_own_section(monkeypatch):
@@ -209,15 +235,13 @@ def test_each_control_sits_in_its_own_section(monkeypatch):
     _, panel, _ = open_editor(monkeypatch, FakeFile())
     boxes = group_boxes_of(panel)
 
-    assert buttons_of(boxes['2. Plate area']) == \
-        ['Save + reload plate (e.g. after adjusting rect)']
-    assert buttons_of(boxes['3. Improve segmentation']) == \
-        ['Remove smaller', 'Remove larger', 'Relabel by lines [u]']
-    assert buttons_of(boxes['4. Analysis preview']) == \
-        ['Preview analysis result']
-    assert buttons_of(boxes['5. Save & continue']) == \
-        ['Save now [w]', 'Jump to sample [j]', 'Next file, no save [n]',
-         'Quit, no save [q]']
+    assert buttons_of(boxes[0]) == []           # view: sliders only
+    assert buttons_of(boxes[1]) == ['Save + reload plate (e.g. after adjusting rect)']
+    assert buttons_of(boxes[2]) == ['Remove smaller', 'Remove larger',
+                                    'Relabel by lines [u]']
+    assert buttons_of(boxes[3]) == ['Preview analysis result']
+    assert buttons_of(boxes[4]) == ['Save now [w]', 'Jump to sample [j]',
+                                    'Next file, no save [n]', 'Quit, no save [q]']
 
 
 def test_hints_sit_in_the_section_they_describe(monkeypatch):
@@ -228,10 +252,63 @@ def test_hints_sit_in_the_section_they_describe(monkeypatch):
     def texts(box):
         return ' '.join(lbl.text() for lbl in box.findChildren(QLabel))
 
-    assert 'line it up' in texts(boxes['1. View'])
-    assert 'Drag the red rectangle' in texts(boxes['2. Plate area'])
-    assert 'Hover over a plant' in texts(boxes['3. Improve segmentation'])
-    assert 'Cmd+W' in texts(boxes['5. Save & continue'])
+    assert 'Press [r]' in texts(boxes[2])   # with the relabel/size controls
+    assert 'Cmd+W' in texts(boxes[4])       # with the buttons that leave
+
+
+def test_a_hint_set_to_none_is_left_out(monkeypatch):
+    """A hint set to None (hint_view, hint_rect) adds no label to its box."""
+    _, panel, _ = open_editor(monkeypatch, FakeFile())
+    boxes = group_boxes_of(panel)
+
+    # only the sliders' own field labels remain ("shift x" / "shift y"), which
+    # magicgui makes; no italic hint label of ours
+    assert [lbl.text() for lbl in boxes[0].findChildren(QLabel) if lbl.text()] \
+        == ['shift x', 'shift y']
+    # the plate-area box is left with just its button
+    assert [lbl.text() for lbl in boxes[1].findChildren(QLabel) if lbl.text()] \
+        == []
+
+
+def test_size_filter_buttons_share_a_row_with_their_input(monkeypatch):
+    """Each "Remove …" button sits beside its own spinbox, not on its own line."""
+    from qtpy.QtWidgets import QHBoxLayout
+
+    _, panel, _ = open_editor(monkeypatch, FakeFile())
+    for caption in ('Remove smaller', 'Remove larger'):
+        button = next(b for b in panel.findChildren(QPushButton)
+                      if b.text() == caption)
+        row = button.parent()
+        assert isinstance(row.layout(), QHBoxLayout)
+        assert row.findChildren(QAbstractSpinBox), \
+            f"{caption} is not on a row with a spinbox"
+
+
+def test_smoothing_defaults_to_5_everywhere(monkeypatch):
+    """Smoothing radius 5 is the pipeline default, and what the editor opens with."""
+    from root_length.functions_pipeline.config import ConfigPipeline
+
+    assert ConfigPipeline().smoothing_diskradius == 5
+    # None stays a valid value, meaning "no smoothing"
+    assert ConfigPipeline(smoothing_diskradius=None).smoothing_diskradius is None
+
+    _, panel, _ = open_editor(monkeypatch, FakeFile())
+    analysis_box = next(b for b in group_boxes_of(panel) if 'nalysis' in b.title())
+    values = {lbl.text(): lbl.parent().findChildren(QAbstractSpinBox)[0].value()
+              for lbl in analysis_box.findChildren(QLabel)
+              if lbl.parent().findChildren(QAbstractSpinBox)}
+
+    assert values['Smoothing radius (0=off)'] == 5
+
+
+def test_a_section_with_nothing_left_is_dropped(monkeypatch):
+    """A box whose entries are all absent disappears rather than showing empty."""
+    _, panel, _ = open_editor(monkeypatch, None)
+    # hint_rect is None and there is no file to reload, so the plate-area
+    # section has no contents at all and must not be built
+    for box in group_boxes_of(panel):
+        assert box.findChildren(QPushButton) or box.findChildren(QLabel), \
+            f"empty section left in the panel: {box.title()!r}"
 
 
 def test_nothing_was_lost_in_the_regrouping(monkeypatch):
@@ -256,8 +333,9 @@ def test_no_save_buttons_without_a_file(monkeypatch):
     captions = buttons_of(panel)
     assert 'Save now [w]' not in captions
     assert not any('reload' in c.lower() for c in captions)
-    # the sections themselves are all still there
-    assert [box.title() for box in panel.findChildren(QGroupBox)] == SECTIONS
+    # the plate-area section had nothing but that button left, so it goes too;
+    # every other section survives
+    assert len(group_boxes_of(panel)) == N_SECTIONS - 1
 
 
 ################################################################################

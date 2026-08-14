@@ -116,7 +116,8 @@ def add_analysis_layers(viewer, plant_results, shape):
 # %% the widget docked in the editor
 
 # Settings outlive the viewer, so the choices made on one plate still apply to
-# the next file of an editing session.
+# the next file of an editing session. Starts at the pipeline defaults, so the
+# preview begins from what a scripted run would do.
 LAST_CONFIG = ConfigPipeline()
 
 
