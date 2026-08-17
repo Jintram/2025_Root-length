@@ -73,8 +73,15 @@ package.
                             - Places a seed pixel at mouse position (row, col) with label 5, then finds the nearest
                             background pixel (value == 0) to the left and right of the seed using
                             distance grid, and draws line between those two (using label 5).
-                            - TO DO: ADD ILLUSTRATION/LINK TO SCRATCH PAD CODE HERE? --> PERHAPS CREATE LITTLE
-                            SCRIPT THAT DIRECTLY CALLS THIS FUNCTION BASED ON EXAMPLE?
+                            
+                            <img src="figures/technical/give_boundary_line.png" width=45%>
+                            <img src="figures/technical/give_boundary_line_fail.png" width=45%><br>
+                            ***Left image.** Illustration of procedure. To the left
+                            and right of the black cross (determined by the mouse click) the pixels with the lowest
+                            distance (color-coded) outside the plant mask (light green) are located. Those
+                            two pixels are connected by a boundary line (red). The **right image** shows a case
+                            where this fails.*
+                            
                             - Requires updating mask with "u" functionality (see below).
                     - manually draw a new root/shoot boundary with **t**
                         - important function

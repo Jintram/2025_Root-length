@@ -132,7 +132,7 @@ def correct_mask_rootshootline(mask, row, col):
 
     Places a seed pixel at (row, col) with label 5, then finds the nearest
     background pixel (value == 0) to the left and right of the seed using
-    a precomputed Euclidean distance grid. A line is drawn between those
+    a precomputed Euclidean distance grid (_DIST_GRID). A line is drawn between those
     two background pixels using skimage.draw.line.
 
     Parameters
@@ -173,6 +173,8 @@ def correct_mask_rootshootline(mask, row, col):
     region = mask[row_min:row_max, col_min:col_max]
     distances = _DIST_GRID[grid_row_min:grid_row_max,
                            grid_col_min:grid_col_max].copy()
+        # plt.imshow(distances); plt.imshow(region, cmap=cmap_custom_plantclasses, alpha=(region>0)*1.0)
+        # see also plot below
 
     # Mask out foreground pixels (only labels 1, 2, and 5 are foreground)
     foreground = (region == 1) | (region == 2) | (region == 5)
@@ -204,6 +206,12 @@ def correct_mask_rootshootline(mask, row, col):
         print("  No background found to the right — skipping.")
         return mask
 
+    # plt.imshow(distances); plt.imshow(region, cmap=cmap_custom_plantclasses, alpha=(region>0)*1.0); 
+    # offset = np.array([row_min, col_min])
+    # plt.plot(LOCATION[1]-offset[0], LOCATION[0]-offset[1], "xk")
+    # plt.plot(left_idx[1], left_idx[0], "xk")
+    # plt.plot(right_idx[1], right_idx[0], "xk")
+    
     # Draw line between the two background pixels (label=5, foreground only)
     rr, cc = line(left_point[0], left_point[1],
                   right_point[0], right_point[1])
