@@ -83,7 +83,7 @@ def analyze_labels(img_mask, config_pipeline):
     # Build PlantSample objects for each QC-passed plant
     current_sample_all_plants = []
     for idx, plant_mask in enumerate(list_img_indivplants[sel_plants]):
-        # idx = 6; plant_mask = list_img_indivplants[sel_plants][idx]
+        # idx = 0; plant_mask = list_img_indivplants[sel_plants][idx]
 
         root_mask = plant_mask == 2
         shoot_mask = plant_mask == 1
@@ -115,6 +115,9 @@ def analyze_labels(img_mask, config_pipeline):
         # i = 14; sample=current_sample_all_plants[i]
         # i = 6;  sample=current_sample_all_plants[i]
         
+        # plt.imshow(sample.root.mask)
+        # plt.imshow(sample.plant_mask)
+        
         print(f"Currently processing plant {i+1} of {len(current_sample_all_plants)}")
         
         # Perform calculations based on this plant mask
@@ -137,6 +140,7 @@ def analyze_plate(curr_file, config_pipeline):
     # Load input
     segfile_data = np.load(curr_file.fullpath)
     img_mask = segfile_data['img_pred_lbls']
+        # plt.imshow(img_mask)
 
     # Discard labels outside the plate area, if one was stored by
     # `edit_segfiles.compute_and_save_mask_rect_all` or drawn in napari.
@@ -148,10 +152,12 @@ def analyze_plate(curr_file, config_pipeline):
         img_mask = pl_prep.apply_mask_rect(img_mask, mask_rect)
         print(f"Applied mask_rect {mask_rect}: dropped "
               f"{n_labeled_before - np.count_nonzero(img_mask)} labeled pixels.")
+        # plt.imshow(img_mask)
 
     # Do the actual work
     img_mask_clean, current_sample_all_plants = \
-        analyze_labels(img_mask, config_pipeline=config_pipeline)
+        analyze_labels(img_mask=img_mask, 
+                       config_pipeline=config_pipeline)
 
     # preparing output
     output_dir_plot = os.path.join(curr_file.outputdir, 'lenplots/', curr_file.subdir)
@@ -208,7 +214,7 @@ def analyze_all_plates(df_filelist, output_dir, config_pipeline=None):
     time_taken = []
     for file_idx in range(len(df_filelist)):
         # file_idx = 5
-        # file_idx = 1
+        # file_idx = 0
         # file_idx = 37
         # file_idx = 462
         
@@ -224,7 +230,8 @@ def analyze_all_plates(df_filelist, output_dir, config_pipeline=None):
         print(f"Processing file {file_idx+1}/{len(df_filelist)}: {curr_file.fullpath}")
         
         # Analyze the plate
-        analyze_plate(curr_file, config_pipeline=config_pipeline)
+        analyze_plate(curr_file=curr_file, 
+                      config_pipeline=config_pipeline)
         
         # record end time
         end_time = time.time(); time_taken.append(end_time - start_time)

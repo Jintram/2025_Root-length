@@ -142,7 +142,6 @@ def plot_bboxes(img_mask, img_bboxes):
     
 
 def find_individual_plants(img_mask, 
-                           lbl_of_interest=2, 
                            min_count=5):    
     """
     Find plant regions in the mask, and nr of root regions in each plant.

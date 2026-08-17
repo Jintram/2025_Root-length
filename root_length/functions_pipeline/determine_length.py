@@ -649,11 +649,11 @@ def get_long_path_in_graph_nodearea(sample: TissueSample) -> TissueSample:
     # so only consider the nodes that are reachable from the source)
     all_longest_paths = []
     all_max_lengths = []
-    for source in source_nodes:   
+    for source in source_nodes:
 
         # Initialize per source
         longest_path = []
-        max_length = 0.0     
+        max_length = 0.0
         
         for target in nx.node_connected_component(graph, source):
             if source != target:
@@ -673,7 +673,7 @@ def get_long_path_in_graph_nodearea(sample: TissueSample) -> TissueSample:
 
     # Now store the longest path
     sample.longest_path = longest_path
-    sample.max_length_px_bynx = max_length
+    sample.max_length_px_bynx = max(all_max_lengths)
     sample.total_length_px_bynx = sum(all_max_lengths)
     return sample
 
@@ -685,6 +685,7 @@ def build_longest_path_mask(sample: TissueSample) -> TissueSample:
     sample.mask_longest_path = \
         np.isin(sample.labeled_segments, sample.longest_path)
     # plt.imshow(sample.mask_longest_path)
+    # plt.imshow(sample.labeled_segments)
 
     return sample
 
@@ -1005,8 +1006,8 @@ def run_default_length_pipeline(plant: PlantSample,
         plant = split_shared_skeleton(plant, 'shoot')
 
     # Measure both tissues
-    plant.root = run_tissue_pipeline(plant.root)
-    plant.shoot = run_tissue_pipeline(plant.shoot)
+    plant.root = run_tissue_pipeline(sample = plant.root)
+    plant.shoot = run_tissue_pipeline(sample = plant.shoot)
 
     # Add distance in mm (if pixel size is known)
     if plant.pixel_size_mm is not None:
