@@ -80,6 +80,8 @@ current 1st file:
     - [X] documentation_technical.md (note "TO DO"s)
         - [ ] perform final check on documentation_technical?    
     - [ ] README.md    
+        - [ ] Finish walkthrough
+        - [ ] Remove/edit old parts regarding technical considerations in readme.md
     - (youtube movie giving "tour"?)
 
 (previously created some additional featuers in the napari GUI)
