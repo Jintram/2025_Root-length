@@ -77,8 +77,9 @@ current 1st file:
 20250530_OY_09_all-plants-projected.pdf
 
 [ ] CONTINUE WITH
-    - documentation_technical.md (note "TO DO"s)
-    - README.md
+    - [X] documentation_technical.md (note "TO DO"s)
+        - [ ] perform final check on documentation_technical?    
+    - [ ] README.md    
     - (youtube movie giving "tour"?)
 
 (previously created some additional featuers in the napari GUI)
