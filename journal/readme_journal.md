@@ -82,7 +82,8 @@ current 1st file:
     - [ ] README.md    
         - [ ] Finish walkthrough
         - [ ] Remove/edit old parts regarding technical considerations in readme.md
-    - (youtube movie giving "tour"?)
+    - [ ] Check differences between models that were trained, get overview of this!
+    - [ ] (youtube movie giving "tour"?)
 
 (previously created some additional featuers in the napari GUI)
 
