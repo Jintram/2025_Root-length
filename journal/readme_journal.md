@@ -91,6 +91,7 @@ current 1st file:
 
 - [ ] Create two kind of output plots for the length, also have the
 overlay plot with original image and "offset overlay view"
+- [ ] Create example with 1 or two images to show how to run the whole pipeline.
 
 **
 
