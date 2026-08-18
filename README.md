@@ -55,6 +55,8 @@ See below for more details.
 
 ## Setup
 
+### Environment and "cheeky_cells"
+
 I'm using the same environment as the [Cheeky_cells](https://github.com/Jintram/Cheeky-cells) package
 to run these scripts. For installation instructions of that environment,
 [see that repository](https://github.com/Jintram/Cheeky-cells).
@@ -69,6 +71,7 @@ see the [same url](https://github.com/Jintram/Cheeky-cells) as above.
 The Cheeky_cells package performs the segmentation.
 
 ### Download the scripts
+
 
 To use them, you will need to put the scripts in this repository on your computer.
 
