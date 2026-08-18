@@ -190,6 +190,14 @@ def preprocess_getbbox_insideplate2(img_in_raw, margin_left = 100, margin_right 
     img_cropped = img_in_raw[rect[0]:rect[1], rect[2]:rect[3]].copy()
     # plt.imshow(img_cropped); plt.show()
     
+    # create a plot showing the image, the bbox without margin, and the bbox with margin
+    # plt.imshow(img_in_raw)
+    # plt.plot([c0, c1, c1, c0, c0], [r0, r0, r1, r1, r0], 
+    #          color="red", linewidth=2)
+    # plt.plot([rect[2], rect[3], rect[3], rect[2], rect[2]], 
+    #          [rect[0], rect[0], rect[1], rect[1], rect[0]], 
+    #          color="green", linewidth=2)
+    
     return img_cropped, rect
 
 # %%

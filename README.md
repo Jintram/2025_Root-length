@@ -113,17 +113,19 @@ See the file [documentation_technical.md](documentation_technical.md)
 - You have your raw image data organized in a directory, which may also have
 subdirectories that contain image data.
 
-- `<directory_with_raw_data>`
-    - `<some_folder>`
-        - `your_file.tif`
-        - `(..)`
-    - `<some_other_folder>`
-        - `<yet_another_folder>`
-            - `yet_another_file.tif`
+    For example:
+
+    - `<directory_with_raw_data>`
+        - `<some_folder>`
+            - `your_file.tif`
             - `(..)`
-    - `(..)`
-    - `your_other_file.tif`
-    
+        - `<some_other_folder>`
+            - `<yet_another_folder>`
+                - `yet_another_file.tif`
+                - `(..)`
+        - `(..)`
+        - `your_other_file.tif`
+        
 ### Output folders that will be generated
 
 - The script will create two output folders, for which you need to specify a
@@ -169,6 +171,7 @@ Import the 'orchestrator', that module provides functions that calls the correct
 of the scripts in this library.
 
 ```
+# import library for machine learning segmentation
 import cheeky_cells.orchestrators.orchestrate_phase3_clean as o3
 ```
 
@@ -177,6 +180,7 @@ can be used to visualize the end result of the segmentation.
 Import the plotting library:
 
 ```
+# import additional plotting functions
 import cheeky_cells.plotting.plotting as pp
 ```
 
@@ -184,6 +188,7 @@ It is also convenient to define a custom color palette for the output.
 This can be done as follows:
 
 ```
+# Define a custom color palette 
 # Define the colors as an array of hex codes; this will correspond to 
 # classes that are segmented
 custom_colors_plantclasses = [
@@ -192,7 +197,7 @@ custom_colors_plantclasses = [
     '#FFFFFF', # class 2, root, white
     '#A52A2A', # class 3, seed, brown
     '#006400', # class 4, leaf, dark green
-    '#FF0000', # optional bright red color
+    '#FF0000', # bright red color for corrections
 ]
 
 # now convert to ListedColormap 
@@ -202,11 +207,9 @@ cmap_custom_plantclasses = ListedColormap(custom_colors_plantclasses)
 
 ### Configuration
 
-Calling 
-```
-config3_ara_root = o3.Phase3Config(..)
-```
-will return an python object that stores parameters that tell
+Before running the script, some parameters need to be set manually.
+This can be done by using the function `o3.Phase3Config()`.
+This creates python object that stores parameters that tell
 the scripts how to perform the run.
 
 A typical configuration will look as the following example:
@@ -237,50 +240,55 @@ on the parameters.
 An excerpt for the parameters used above:
 
 ```
-    segmentation_dir : str
-        Directory where segmentation output will be put. Holds
-        segfiles/<subdir>/, plots/<subdir>/, and log_segmentation.yaml.
-        <subdir>/ will mimic the original subdirectories of the data input dir.
-    nr_classes : int
-        Number of different classes (things) to segment.
-    nr_channels_input : int
-        Type of input, typically 1 for gray scale, and 3 for color images.
-    model_checkpoint_to_load : str
-        Path to already trained model (.pth file) to be used for segmentation,
-        e.g. <training_dir>/models/modelUNet20251026_1027.pth.
-    bg_percentile : int
-        Determines how images are normalized before shown to ML network.
-        The percentile determines what is considered background, which will
-        be subtracted to normalize the image intensity range.
-    data_path_input : str
-        Path to directory with images to segment. May contain subdirectories
-        with images.
-    fn_specific_preprocessing : Callable | None
-        Optional preprocessing function that pre-processes all images to be
-        segmented. Should look like:
-        `img_toseg_prepr, prepr_info = config.fn_specific_preprocessing(img_toseg)`
-        Where `img_toseg` and `img_toseg_prepr` are input and output image,
-        `prepr_info` is additional information generated that also gets
-        stored later in npz.
-    fn_plotting : Callable | None
-        If set, plots will be made using this function. Should look like:
-        `fig, ax = config.fn_plotting(img, pred, cmap, ..)`
-        where **config.extraplottingparams will be passed to the function as well.
-    cmap_custom : ListedColormap | None
-        Custom cmap of type matplotlib.colors.ListedColormap can be provided
-        for predicted segmentation masks. If None, a default cmap will be used.
-    DPI_plots : int
-        Optional; DPI used for plots.
+# Explanation of some o3.Phase3Config parameters you can use:
+
+segmentation_dir : str
+    Directory where segmentation output will be put. Holds
+    segfiles/<subdir>/, plots/<subdir>/, and log_segmentation.yaml.
+    <subdir>/ will mimic the original subdirectories of the data input dir.
+nr_classes : int
+    Number of different classes (things) to segment.
+nr_channels_input : int
+    Type of input, typically 1 for gray scale, and 3 for color images.
+model_checkpoint_to_load : str
+    Path to already trained model (.pth file) to be used for segmentation,
+    e.g. <training_dir>/models/modelUNet20251026_1027.pth.
+bg_percentile : int
+    Determines how images are normalized before shown to ML network.
+    The percentile determines what is considered background, which will
+    be subtracted to normalize the image intensity range.
+data_path_input : str
+    Path to directory with images to segment. May contain subdirectories
+    with images.
+fn_specific_preprocessing : Callable | None
+    Optional preprocessing function that pre-processes all images to be
+    segmented. Should look like:
+    `img_toseg_prepr, prepr_info = config.fn_specific_preprocessing(img_toseg)`
+    Where `img_toseg` and `img_toseg_prepr` are input and output image,
+    `prepr_info` is additional information generated that also gets
+    stored later in npz.
+fn_plotting : Callable | None
+    If set, plots will be made using this function. Should look like:
+    `fig, ax = config.fn_plotting(img, pred, cmap, ..)`
+    where **config.extraplottingparams will be passed to the function as well.
+cmap_custom : ListedColormap | None
+    Custom cmap of type matplotlib.colors.ListedColormap can be provided
+    for predicted segmentation masks. If None, a default cmap will be used.
+DPI_plots : int
+    Optional; DPI used for plots.
 ```
 
-On other machine's than new macbooks, the `target_device` setting is relevant as well.
+On other machine's than new macbooks, the `target_device` must be set properly, 
+see below.
 
 ```
-    target_device : str
-        Torch device that the model and image tensors are moved to;
-        'mps' (Apple Silicon), 'cuda' (NVIDIA) or 'cpu'. Note that 'cpu' will
-        typically work on all machines, but will be very slow. Use 'mps' or
-        'cuda' if available.
+# The target device parameter must be set properly
+
+target_device : str
+    Torch device that the model and image tensors are moved to;
+    'mps' (Apple Silicon), 'cuda' (NVIDIA) or 'cpu'. Note that 'cpu' will
+    typically work on all machines, but will be very slow. Use 'mps' or
+    'cuda' if available.
 ```
 
 ### Compiling list of image files to segment.
@@ -289,6 +297,7 @@ To start segmentation, the pipeline requires you to first compile a list of the
 images in your data directory, which can be done with 
 
 ```
+# Compile the list of files to segment
 config3_ara_root = o3.collect_filelist(config3_ara_root)
 ```
 
@@ -296,37 +305,37 @@ this will store a file list into the configuration object.
 
 If you like, you can inspect that file list,
 
-```
-config3_ara_root.df_metadata
-```
+```pycon
+>>> config3_ara_root.df_metadata
 
-yields:
-
-```
 	subdir	filename	segmentation_channel	train_or_test
 0	.	20250530_OY_07.tif	all	
 1	.	20250527_OY05.tif	all	
 2	.	20250527_OY11.tif	all	 
 (..)
+
 ```
 
 The `segmentation_channel` and `train_or_test` are for advanced purposes, ie in case
-you want to re-use this data for training.
+you want to re-use this data for training. They can be left empty.
 
-For a general segmentation run, `<yourconfig>.df_metadata` just serves as a file list for all
+For a default segmentation run, `<yourconfig>.df_metadata` serves as a file list for all
 the files you want to segment (in pandas dataframe format).
 
 ### Running the pipeline
 
 Running the command `o3.segment_all_files(<yourconfig>)` will 
 now automatically start segmenting the images in the folder 
-set by `<yourconfig>.data_path_input`.
+set by `<yourconfig>.data_path_input` 
+(using aforementioned `<yourconfig>.df_metadata` as file list).
 
-Additional options to the `o3.segment_all_files()` function are
-`max_files_to_process` and `overwrite_files=True`, as can be found with 
-`help(o3.segment_all_files)`.
+Additional arguments to the `o3.segment_all_files()` function are
+`max_files_to_process` and `overwrite_files=True` (see also
+`help(o3.segment_all_files)`):
 
 ```    
+# optional settings for segment_all_files()
+
 overwrite_files: 
     Boolean indicating whether to overwrite existing segmentation files.
 max_files_to_process: 
@@ -336,11 +345,10 @@ max_files_to_process:
 
 The output will be saved to the directory 
 `<yourconfig>.segmentation_dir`, which will contain two subfolders, `segfiles` and `plots`.
-Under the section "Output folders that will be generated" this output directory is listed as
-`SEG/`.
+See the section "Output folders that will be generated" 
+(the `segmentation_dir` in this case is `SEG/`).
 
 -----------------------------------------------------------------------------
-
 
 ## Part 2: manual correction + length analysis 
 
@@ -350,6 +358,7 @@ To start the analysis, you'll first need to import specific scripts from
 this repository. This can be done via the usual python import statements:
 
 ```
+# Import root analysis libraries
 import root_length.functions_files.filelisting as pl_flist
 import root_length.functions_pipeline.analyze_plate as pl_analyze
 import root_length.functions_pipeline.edit_segfiles as pl_edit
@@ -363,6 +372,7 @@ You can now determine which files to analyze, by
 running the following command.
 
 ```
+# Compile a list of files to analyze
 df_filelist, metadata_toseg_filepath = \
     pl_flist.gen_metadatafile_segfiles(
         directory_inputfiles=/directory/with/seg/files/,
@@ -373,11 +383,11 @@ df_filelist, metadata_toseg_filepath = \
 `directory_inputfiles` needs to point to **the subdirectory with the
 segmentation files**, or `SEG/segfiles` in the above overview.
 
-You can also supply your desired output directory,
+You can also supply an output directory (`directory_outputfiles`),
 where an excel version of the file list will
 be stored.
 
-With the code above `df_filelist` now is a dataframe with all files, 
+`df_filelist` now is a dataframe with all files, 
 and `metadata_toseg_filepath` holds the path where an excel with that information
 is saved (if any).
 
@@ -391,12 +401,13 @@ features from the dish in which the plants are kept.
 (Plant and dish features are sufficiently similar to make this a challenging
 task.)
 
-To handle removing dish artifacts automatically, a region of interest can
+To handle removing dish artifacts automatically, a region of interest (ROI) can
 be determined automatically, and added to the segmentation files.
 
 To achieve this, call the function `pl_edit.compute_and_save_mask_rect_all()`:
 
 ```
+# Determine ROIs on the plates
 pl_edit.compute_and_save_mask_rect_all(
     df_filelist=df_filelist,
     dir_inputfiles=/directory/with/seg/files/,
@@ -404,17 +415,171 @@ pl_edit.compute_and_save_mask_rect_all(
 )
 ```
 
-As input, this requires the file list (`df_filelist` argument), where to find the segmentation files
-(through `dir_inputfiles`), and the directory with the original image files
+As input, this requires the file list (`df_filelist` argument), 
+where to find the segmentation files
+(through `dir_inputfiles`, same as for `gen_metadatafile_segfiles()`),
+and the directory with the original image files
 (`dir_imagefiles`). 
 
 As mentioned, the resulting ROIs will be saved to the original seg files.
 They will be used automatically in the next steps of the pipeline and can
 be adjusted as well.
 
+Optionally, you can finetune the automatically generated ROI.
+
+<img src=figures/plate_auto-ROI_margins.png width=50%><br>
+
+*The image above shows the automatically identifed plate borders (red 
+recteangle), and the margins that are automatically added (green
+recteangle). Per default, the margins are 5% of the total image on the 
+left and right, and 10% of the total image on the top and bottom.*
+
+This can be customized by using the following input arguments to 
+`compute_and_save_mask_rect_all()`:
+
+```
+margin_left=0.05, 
+margin_right=0.05,
+margin_top=0.1, 
+margin_bottom=0.1
+```
+
+These margins can be supplied as a fraction (between 0 and 1) or as
+a number of pixels.
+
+Note that if the automatically calculated ROI doesn't cover 
+50% of the area, ROI calculation will be forfitted, and the ROI will
+be made to cover the entire plate. This setting can be changed using
+`min_expected_area` (either in pixels or a number between 0 and 1 as
+a fraction, default `min_expected_area=0.5`).
+
+Once generated, the ROIs can also be adjusted manually per plate in the next step.
+
 #### Manually correct the segmentation masks
 
-(..)
+Some plates will show artifacts in the segmentation.
+Especially the root/shoot boundary is hard to determine.
+
+Therefor, all data needs to be manually checked and ammended if necessary.
+
+To manually check and edit the segmentation, run the following code:
+
+```python
+# Start GUI to manually check and edit the segmentation
+pl_edit.edit_all_segfiles(df_filelist=df_filelist,
+                         dir_inputfiles="/directory/with/seg/files/",
+                         dir_imagefiles="dir_imagefiles=/directory/with/image/files/")    
+```
+
+This function requires the previously compiled `df_filelist` file list, 
+the directory with segmentation files (like before), and the directory
+with the original image files.
+
+When running this code, a graphical user interface (GUI) window will pop up
+(based on the python `napari` library).
+
+<img src=figures/GUI_napari_screenshot.png width=100%><br>
+*The Napari-based graphical user interface.*
+
+On the left is the default Napari menu. You can use this to erase and draw
+labeled areas. Per default, the segmetation layer is selected. If you select the
+"mask_rect" layer (on the left, bottom), the layer tools will change. You
+can then select the "select shapes" button on the top to adjust the ROI
+recteangle. You will have to press the "save + reload" button in the right
+menu to have ROI changes take effect.
+
+Using the standard Napari buttons you can also change how the data is visualized.
+
+In the menu on the right, I added additional options:
+
+- Importantly, you can easily adjust the root/shoot boundary. Place the mouse
+where you want the new border, and use either the "r" or "t" keyboard button to 
+automatically generate a border (see [documentation_technical.md](documentation_technical.md) 
+for details on the difference between "r" and "t"). 
+To have changes take effect, press the "u" key.
+- Offset the segmentation layers, such that the plants are visible. (For mouse
+clicks, the original image serves as the point of reference.)
+- You can remove small or large objects (remove smaller and remove larger buttons).
+This is convenient to remove artifacts.
+- You can check whether the current length analysis is correct, by using 
+the "Preview analysis result". This doesn't save the information, but is 
+simply to preview the result from the later analysis steps.
+
+When done, you can navigate using one of the four buttons on the right bottom,
+or press CTRL+W/CMD+W to close the viewer and automatically save the 
+current corretions and proceed with the next plate.
+
+If all plates in this data set are checked, you can proceed with the next
+step.
+
+#### Analyze the data
+
+You can now run the analysis using the following code. First set up
+another configuration parameter for the length pipeline:
+
+```python
+# Import a configuration tool
+from root_length.functions_pipeline.config import ConfigPipeline
+
+# Set up configuration 
+config_pipeline = \
+    ConfigPipeline(
+        # Smooths the root/shoots to avoid spurious branching
+        smoothing_diskradius=5,
+        dilation_radius_maximum=15,
+        dpi_plots=1200
+        )
+```
+
+Here, `smoothing_diskradius` sets the amount by which the tissues are 
+"smoothed" (technically, it's a morphological closing operation with disk
+of this radius), `dilation_radius_maximum` is a maximum radius by which potential
+gaps in the tissue (e.g. because another tissue such as a seed
+splits the root in two) are attempted to be closed (gaps of twice
+this radius can be closed, so this parameter should be on the order
+of half the gaps that are expected, too large gaps should not be attempted
+to be closed), `dpi_plots` sets the resolution for the plots that 
+will be generated (`1200` allows proper visual inspection of
+the analysis).
+
+Then, the analysis can be run using the command:
+
+```python
+# Run the analysis
+pl_analyze.analyze_all_plates(
+    df_filelist=df_filelist,
+    output_dir="/directory/to/put/output/",
+    config_pipeline=config_pipeline)
+```
+
+The input arguments required are `df_filelist`, the list of files to be analyzed,
+`output_dir`, where to store the output of the analysis, and `config_pipeline`,
+which is defined above.
+
+```python
+# Gather all data
+pl_analyze.generate_df_all(
+    df_filelist=df_filelist, 
+    datadir="/directory/to/put/output/")
+```
+
+As described in the overview at the beginning, together, the functions `XXX` 
+and `XXX` will 
+output files to the `output_dir`, which will then look as follows:
+
+- `/directory/to/put/output/` (called `LEN/` in the text above)
+        - `LEN/all_samples_length.xlsx` is a summary file which holds the plant root
+        lengths for all analyzed plates from the input folder. You can use this for 
+        plotting. Metadata about conditions can be added based on file and subfolder
+        names.
+        - `LEN/data` mirrors the original directory structure, where instead
+        of pictures of plates, *there are `.tsv` files, which list the plant lengths
+        in the plate. (Plants are assigned unique IDs.)*
+        - `LEN/lenplots` mirrors the original directory structure, where instead
+        of pictures of plates, *there are plots showing the plates with projected on top
+        the lengths of each plant.*    
+
+
 
 TO DO: CONTINUE WRITING HERE
 

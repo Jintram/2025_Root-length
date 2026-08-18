@@ -94,6 +94,7 @@ pl_analyze.analyze_all_plates(df_filelist=df_filelist,
                         config_pipeline=config_pipeline)
 
 # Now make one big overview dataframe
-pl_analyze.generate_df_all(df_filelist, DIR_OUTPUTFILES)
+pl_analyze.generate_df_all(df_filelist=df_filelist, 
+                           datadir=DIR_OUTPUTFILES)
 
 

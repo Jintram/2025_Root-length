@@ -156,7 +156,11 @@ package.
                 - Overview figure 
                 - `.csv` file is written **for this plate** with data for all
             the individual plants (root length, shoot length, ..)
-    
+- Call to `generate_df_all`
+    - (Defined in `root_length/functions_pipeline/analyze_plate/`)
+    - This function will loop over all the samples in `df_filelist`, 
+    load the `.csv` data, and compile one big dataframe 
+    with all data. It will export that data to `datadir`.
     
 
 - description of `run_default_length_pipeline()`
