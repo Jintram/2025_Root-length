@@ -582,16 +582,16 @@ and `generate_df_all()` will
 output files to the `output_dir`, which will then look as follows:
 
 - `/directory/to/put/output/` (called `LEN/` in the text above)
-        - `LEN/all_samples_length.xlsx` is a summary file which holds the plant root
-        lengths for all analyzed plates from the input folder. You can use this for 
-        plotting. Metadata about conditions can be added based on file and subfolder
-        names.
-        - `LEN/data` mirrors the original directory structure, where instead
-        of pictures of plates, *there are `.tsv` files, which list the plant lengths
-        in the plate. (Plants are assigned unique IDs.)*
-        - `LEN/lenplots` mirrors the original directory structure, where instead
-        of pictures of plates, *there are plots showing the plates with projected on top
-        the lengths of each plant.*    
+    - `LEN/all_samples_length.xlsx` is a summary file which holds the plant root
+    lengths for all analyzed plates from the input folder. You can use this for 
+    plotting. Metadata about conditions can be added based on file and subfolder
+    names.
+    - `LEN/data` mirrors the original directory structure, where instead
+    of pictures of plates, *there are `.tsv` files, which list the plant lengths
+    in the plate. (Plants are assigned unique IDs.)*
+    - `LEN/lenplots` mirrors the original directory structure, where instead
+    of pictures of plates, *there are plots showing the plates with projected on top
+    the lengths of each plant.*    
 
 You can now inspect and visualize data with your favorite tools,
 e.g. by loading `all_samples_length.xlsx`.

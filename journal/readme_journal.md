@@ -87,6 +87,11 @@ current 1st file:
 
 (previously created some additional featuers in the napari GUI)
 
+#### Suggestions Yuzeng
+
+- [ ] Create two kind of output plots for the length, also have the
+overlay plot with original image and "offset overlay view"
+
 **
 
 - [ ] See previous entries
