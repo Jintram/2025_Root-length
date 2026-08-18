@@ -556,6 +556,8 @@ The input arguments required are `df_filelist`, the list of files to be analyzed
 `output_dir`, where to store the output of the analysis, and `config_pipeline`,
 which is defined above.
 
+Finally, you need to run:
+
 ```python
 # Gather all data
 pl_analyze.generate_df_all(
@@ -563,8 +565,17 @@ pl_analyze.generate_df_all(
     datadir="/directory/to/put/output/")
 ```
 
-As described in the overview at the beginning, together, the functions `XXX` 
-and `XXX` will 
+Which will loop over all the samples in `df_filelist`, 
+load the `.csv` data, and compile one big dataframe 
+with all data. It will export that data to `datadir`.
+(This function is independent from the 
+previous functions, so in advanced use cases it allows you to combine
+data from multiple separate analyses, if you collect
+your data in the same folder and generate a new
+df_filelist.)
+
+As described in the overview at the beginning, together, the functions `analyze_all_plates()` 
+and `generate_df_all()` will 
 output files to the `output_dir`, which will then look as follows:
 
 - `/directory/to/put/output/` (called `LEN/` in the text above)
@@ -579,10 +590,8 @@ output files to the `output_dir`, which will then look as follows:
         of pictures of plates, *there are plots showing the plates with projected on top
         the lengths of each plant.*    
 
-
-
-TO DO: CONTINUE WRITING HERE
-
+You can now inspect and visualize data with your favorite tools,
+e.g. by loading `all_samples_length.xlsx`.
 
 -----------------------------------------------------------------------------
 
